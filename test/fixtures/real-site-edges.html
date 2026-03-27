@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Real-Site Edge Case Fixture</title>
+<!--
+  Replicates edge cases found analyzing Stripe, Apple, Shopify, GitHub, Wikipedia.
+  - Light mode with many neutrals (like Wikipedia's monochromatic palette)
+  - Cross-origin stylesheet simulation (blocked sheets)
+  - Large number of CSS custom properties (like GitHub's 380 colors)
+  - Mixed dark/light sections (like Shopify Dawn theme escapes)
+  - Dense link lists with small touch targets (like Wikipedia)
+  - Deep nesting with overlapping positioned elements
+  - Elements with addEventListener-only handlers (no inline/jQuery)
+  - Various gradient types
+  - Responsive breakpoints in inline styles
+-->
+<style>
+  :root {
+    /* Large token set — simulates GitHub's massive custom property list */
+    --color-fg-default: #1f2328;
+    --color-fg-muted: #656d76;
+    --color-fg-subtle: #6e7781;
+    --color-fg-accent: #0969da;
+    --color-fg-success: #1a7f37;
+    --color-fg-attention: #9a6700;
+    --color-fg-danger: #d1242f;
+    --color-fg-done: #8250df;
+    --color-bg-default: #ffffff;
+    --color-bg-subtle: #f6f8fa;
+    --color-bg-inset: #eff2f5;
+    --color-bg-emphasis: #24292f;
+    --color-border-default: #d0d7de;
+    --color-border-muted: #d8dee4;
+    --color-border-subtle: rgba(27,31,36,0.15);
+    --color-neutral-emphasis-plus: #24292f;
+    --color-neutral-emphasis: #6e7781;
+    --color-neutral-muted: rgba(175,184,193,0.2);
+    --color-neutral-subtle: rgba(234,238,242,0.5);
+    --color-accent-emphasis: #0969da;
+    --color-accent-muted: rgba(84,174,255,0.4);
+    --color-accent-subtle: #ddf4ff;
+    --color-success-emphasis: #1a7f37;
+    --color-success-muted: rgba(74,194,107,0.4);
+    --color-success-subtle: #dafbe1;
+    --color-attention-emphasis: #9a6700;
+    --color-attention-muted: rgba(212,167,44,0.4);
+    --color-attention-subtle: #fff8c5;
+    --color-danger-emphasis: #cf222e;
+    --color-danger-muted: rgba(255,129,130,0.4);
+    --color-danger-subtle: #ffebe9;
+  }
+
+  * { margin: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--color-bg-default);
+    color: var(--color-fg-default);
+    line-height: 1.5;
+  }
+
+  /* Responsive breakpoints — simulates Apple's 28 breakpoints */
+  @media (max-width: 320px) { .responsive-test { font-size: 12px; } }
+  @media (max-width: 480px) { .responsive-test { font-size: 13px; } }
+  @media (max-width: 640px) { .responsive-test { font-size: 14px; } }
+  @media (max-width: 768px) { .responsive-test { font-size: 15px; } .nav-links { display: none; } }
+  @media (max-width: 834px) { .responsive-test { padding: 12px; } }
+  @media (max-width: 1024px) { .responsive-test { font-size: 16px; } .card-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 1280px) { .responsive-test { max-width: 1200px; } }
+  @media (min-width: 1440px) { .responsive-test { max-width: 1400px; } }
+  @media (min-width: 1920px) { .responsive-test { max-width: 1800px; } }
+
+  /* Navigation — sticky with z-index */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--color-bg-default);
+    border-bottom: 1px solid var(--color-border-default);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .site-header .logo { font-weight: 700; font-size: 20px; }
+  .nav-links { display: flex; gap: 4px; }
+  .nav-links a {
+    /* Small touch targets — simulates Wikipedia/Stripe issue */
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 13px;
+    color: var(--color-fg-accent);
+    text-decoration: none;
+  }
+
+  /* Hero — tall section */
+  .hero-section {
+    padding: 80px 24px;
+    text-align: center;
+    background: linear-gradient(180deg, var(--color-bg-default) 0%, var(--color-bg-subtle) 100%);
+  }
+  .hero-section h1 { font-size: 48px; font-weight: 800; letter-spacing: -0.02em; }
+  .hero-section p { font-size: 20px; color: var(--color-fg-muted); max-width: 600px; margin: 16px auto; }
+
+  /* Card grid — simulates Apple's card-grid pattern */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    padding: 48px 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .card {
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border-default);
+    border-radius: 12px;
+    padding: 24px;
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+  }
+  .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+  .card h3 { font-size: 18px; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--color-fg-muted); }
+
+  /* Dark section — theme escape when on light page */
+  .dark-section {
+    background: var(--color-bg-emphasis);
+    color: #ffffff;
+    padding: 64px 24px;
+    text-align: center;
+  }
+  .dark-section h2 { font-size: 36px; margin-bottom: 16px; }
+  .dark-section p { color: rgba(255,255,255,0.7); max-width: 500px; margin: 0 auto; }
+
+  /* Light card inside dark section — theme escape */
+  .escape-card {
+    background: #ffffff;
+    color: var(--color-fg-default);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 24px auto;
+    max-width: 400px;
+  }
+
+  /* Dense link list — like Wikipedia sidebar */
+  .sidebar-links {
+    padding: 16px;
+    border-right: 1px solid var(--color-border-default);
+    width: 200px;
+    float: left;
+  }
+  .sidebar-links a {
+    display: block;
+    padding: 2px 0;
+    font-size: 12px;
+    color: var(--color-fg-accent);
+    text-decoration: none;
+    /* Very small touch target — below 44x44 WCAG minimum */
+  }
+
+  /* Overlapping positioned elements */
+  .overlap-container { position: relative; height: 200px; margin: 24px; }
+  .overlap-a {
+    position: absolute;
+    top: 0; left: 0;
+    width: 150px; height: 150px;
+    background: var(--color-accent-subtle);
+    border: 1px solid var(--color-accent-emphasis);
+    z-index: 1;
+  }
+  .overlap-b {
+    position: absolute;
+    top: 50px; left: 80px;
+    width: 150px; height: 150px;
+    background: var(--color-success-subtle);
+    border: 1px solid var(--color-success-emphasis);
+    z-index: 2;
+  }
+
+  /* Scroll container */
+  .scroll-box {
+    overflow-y: auto;
+    height: 120px;
+    border: 1px solid var(--color-border-default);
+    padding: 8px;
+    margin: 24px;
+  }
+
+  /* Gradient variations */
+  .gradient-radial { background: radial-gradient(circle at center, #0969da, transparent); height: 60px; }
+  .gradient-conic { background: conic-gradient(from 90deg, #1a7f37, #9a6700, #cf222e, #1a7f37); height: 60px; }
+  .gradient-multi {
+    background: linear-gradient(135deg, #ddf4ff 0%, #dafbe1 33%, #fff8c5 66%, #ffebe9 100%);
+    height: 60px;
+  }
+
+  /* Animation */
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--color-success-emphasis);
+    animation: pulse 2s ease-in-out infinite;
+    display: inline-block;
+  }
+
+  /* Footer */
+  .site-footer {
+    border-top: 1px solid var(--color-border-default);
+    padding: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-fg-subtle);
+  }
+</style>
+</head>
+<body>
+
+<!-- Sticky header with small nav links -->
+<header class="site-header">
+  <span class="logo">EdgeCo</span>
+  <nav class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#docs">Docs</a>
+    <a href="#blog">Blog</a>
+    <a href="#support">Support</a>
+    <a href="#about">About</a>
+    <a href="#contact">Contact</a>
+  </nav>
+</header>
+
+<!-- Hero with gradient background -->
+<section class="hero-section responsive-test">
+  <h1>Ship faster, break nothing</h1>
+  <p>The complete platform for modern teams building production software.</p>
+  <button id="cta-btn" style="padding: 12px 32px; font-size: 16px; background: var(--color-accent-emphasis); color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+    Get Started
+  </button>
+</section>
+
+<!-- Card grid -->
+<section class="card-grid">
+  <div class="card">
+    <h3>Analytics</h3>
+    <p>Real-time dashboards with drill-down.</p>
+    <span class="pulse-dot"></span> Live
+  </div>
+  <div class="card">
+    <h3>Deployments</h3>
+    <p>Zero-downtime deploys in under 30 seconds.</p>
+  </div>
+  <div class="card">
+    <h3>Monitoring</h3>
+    <p>Alerts, logs, and traces in one place.</p>
+  </div>
+</section>
+
+<!-- Dense sidebar links (like Wikipedia) -->
+<div style="clear: both; overflow: hidden; padding: 24px;">
+  <aside class="sidebar-links">
+    <a href="#">Main page</a>
+    <a href="#">Contents</a>
+    <a href="#">Current events</a>
+    <a href="#">Random article</a>
+    <a href="#">About</a>
+    <a href="#">Contact us</a>
+    <a href="#">Donate</a>
+    <a href="#">Help</a>
+    <a href="#">Learn to edit</a>
+    <a href="#">Community portal</a>
+    <a href="#">Recent changes</a>
+    <a href="#">Upload file</a>
+  </aside>
+  <main style="margin-left: 216px;">
+    <h2>Documentation</h2>
+    <p>Content area with sidebar layout.</p>
+  </main>
+</div>
+
+<!-- Dark section with theme escape -->
+<section class="dark-section">
+  <h2>Trusted by thousands</h2>
+  <p>Companies of all sizes rely on our platform.</p>
+  <div class="escape-card">
+    <strong>Customer Quote</strong>
+    <p>"This platform changed everything for our team."</p>
+  </div>
+</section>
+
+<!-- Overlapping positioned elements -->
+<div class="overlap-container">
+  <div class="overlap-a">Box A (z:1)</div>
+  <div class="overlap-b">Box B (z:2)</div>
+</div>
+
+<!-- Scroll container with enough content to scroll -->
+<div class="scroll-box" id="scroll-container">
+  <p>Scroll item 1</p>
+  <p>Scroll item 2</p>
+  <p>Scroll item 3</p>
+  <p>Scroll item 4</p>
+  <p>Scroll item 5</p>
+  <p>Scroll item 6</p>
+  <p>Scroll item 7</p>
+  <p>Scroll item 8</p>
+  <p>Scroll item 9</p>
+  <p>Scroll item 10</p>
+</div>
+
+<!-- Gradient variations -->
+<div class="gradient-radial"></div>
+<div class="gradient-conic"></div>
+<div class="gradient-multi"></div>
+
+<!-- Footer -->
+<footer class="site-footer">
+  &copy; 2024 EdgeCo Inc. All rights reserved.
+</footer>
+
+<!-- JS-only event listeners (no inline handlers, no jQuery) -->
+<script>
+  document.getElementById('cta-btn').addEventListener('click', () => {});
+  document.getElementById('cta-btn').addEventListener('mouseenter', () => {});
+  document.getElementById('scroll-container').addEventListener('scroll', () => {});
+</script>
+
+</body>
+</html>
