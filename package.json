@@ -1,0 +1,30 @@
+{
+  "name": "page-toolkit",
+  "version": "1.0.0",
+  "description": "",
+  "main": "toolkit.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build": "bash build.sh",
+    "test": "npx playwright test",
+    "pretest": "bash build.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EricSeastrand/page-toolkit.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/EricSeastrand/page-toolkit/issues"
+  },
+  "homepage": "https://github.com/EricSeastrand/page-toolkit#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "serve": "^14.2.6"
+  }
+}

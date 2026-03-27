@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Color Test Fixture</title>
+<style>
+  :root {
+    --brand-red: #e63946;
+    --brand-blue: #457b9d;
+    --neutral-dark: #1d3557;
+    --neutral-light: #f1faee;
+  }
+  body {
+    margin: 0;
+    background: #1d3557;
+    color: #f1faee;
+    font-family: sans-serif;
+  }
+  .hero {
+    background: #1d3557;
+    padding: 40px;
+    color: #f1faee;
+  }
+  .hero h1 { color: #e63946; font-size: 48px; margin: 0; }
+  .hero p { color: #a8dadc; }
+
+  /* Theme escape: light container on dark page */
+  .card {
+    background: #f1faee;
+    color: #1d3557;
+    padding: 20px;
+    margin: 20px 40px;
+    border-radius: 8px;
+  }
+  .card h2 { color: #e63946; margin: 0 0 10px; }
+
+  /* Low contrast pair (fails WCAG AA) */
+  .low-contrast {
+    background: #457b9d;
+    color: #6b9fbe;
+    padding: 10px 40px;
+  }
+
+  /* Gradient */
+  .gradient-banner {
+    background: linear-gradient(135deg, #e63946, #457b9d);
+    padding: 20px 40px;
+    color: white;
+  }
+
+  /* SVG fill color */
+  .icon-row { padding: 10px 40px; }
+  .icon-row svg { width: 24px; height: 24px; }
+</style>
+</head>
+<body>
+  <section class="hero">
+    <h1>Brand Title</h1>
+    <p>Subtitle text in accent color</p>
+  </section>
+  <div class="card">
+    <h2>Card Heading</h2>
+    <p>Dark text on light background — a theme escape.</p>
+  </div>
+  <div class="low-contrast">
+    <p>This text has poor contrast.</p>
+  </div>
+  <div class="gradient-banner">
+    <p>Gradient background</p>
+  </div>
+  <div class="icon-row">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#e63946"/></svg>
+  </div>
+</body>
+</html>
