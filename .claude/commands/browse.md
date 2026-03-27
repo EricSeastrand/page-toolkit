@@ -19,13 +19,18 @@ async (page) => {
 }
 ```
 
+For dark mode testing:
+```js
+await page.emulateMedia({ colorScheme: 'dark' });
+```
+
 ## Workflow — Analysis First, Screenshots Never
 
 Do NOT take screenshots for analysis — they mislead (compositing hides bg colors). Only screenshot when the user explicitly asks for visual documentation.
 
 ### Phase 1: Static Analysis
 
-1. **Bootstrap** → inject toolkit + navigate
+1. **Bootstrap** — inject toolkit + navigate
 2. **`pageMap()`** — first call after navigation. Shows page structure, warnings, fold position.
 3. **`themeAudit()` unscoped** — catch theme escapes against the body. Never skip or scope this first.
 4. **`scanAnomalies()`** — contrast failures, light backgrounds, invisible borders.
@@ -54,8 +59,6 @@ For comparing sites or replicating a look: **`siteProfile()`** runs all 7 design
 
 ## Tool Lookup
 
-When you need tool signatures, parameters, or return types: **read `~/page-toolkit/docs/api-reference.md`**.
-
 ### Which tool when?
 
 | Question | Tool |
@@ -70,13 +73,17 @@ When you need tool signatures, parameters, or return types: **read `~/page-toolk
 | Responsive breakpoints? | `responsiveProfile` |
 | CMS / libraries / analytics? | `platformProfile` |
 | Full design system, one call? | `siteProfile` |
-| Touch gesture simulation? | `gesturePlan` → CDP pattern (see api-reference) |
+| Page structure and patterns? | `pageMap` |
+| Layout issues? | `layoutBox`, `layoutAggregate`, `layoutGap`, `layoutTree`, `layoutDensity` |
+| Touch gesture simulation? | `gesturePlan` → CDP pattern |
 
 ## Gotchas
 
 - **`addInitScript` before `goto`** — registers for future navigations, runs before CSP
 - **`themeAudit` scoping trap** — never scope to an overlay first. If the overlay IS the escape, scoping finds nothing.
 - **Interactive state is invisible** to `pageMap`/`themeAudit`/`scanAnomalies` — trigger widgets first
+- **CSS `[type="text"]`** won't match `<input>` without explicit `type` attribute
+- **Toolkit reload**: `page.evaluate(() => { delete window.__ps })` then `page.addScriptTag({ path: '...' })`
 - **`pageMap` returns a string**, not `{text, data}`
 - **`responsiveProfile` CORS**: only extracts from same-origin/CORS-enabled sheets
 - **`sectionTheme`** reads `backgroundColor`, not visual luminance — can't see through canvas/images

@@ -3742,7 +3742,7 @@
   // === Register on window ===
 
   window.__ps = {
-    version: '1.1',
+    version: '2.0',
     // Color tools
     colorProfile,
     paletteProfile,
