@@ -239,13 +239,13 @@ test.describe('scrollAudit with scroll container', () => {
 test.describe('motionProfile with CSS transitions and keyframes', () => {
   test('finds card hover transitions', async ({ page }) => {
     await page.goto('/real-site-edges.html');
-    const result = await page.evaluate(() => __ps.motionProfile());
+    const result = await page.evaluate(() => __ps.motionProfile({ detailed: true }));
     expect(result.transitions.length).toBeGreaterThan(0);
   });
 
   test('finds the pulse keyframe animation', async ({ page }) => {
     await page.goto('/real-site-edges.html');
-    const result = await page.evaluate(() => __ps.motionProfile());
+    const result = await page.evaluate(() => __ps.motionProfile({ detailed: true }));
     expect(result.animations.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -255,21 +255,21 @@ test.describe('motionProfile with CSS transitions and keyframes', () => {
 test.describe('pageMap pattern detection', () => {
   test('returns a string with page dimensions', async ({ page }) => {
     await page.goto('/real-site-edges.html');
-    const result = await page.evaluate(() => __ps.pageMap());
+    const result = await page.evaluate(() => __ps.pageMap({ tree: true }));
     expect(typeof result).toBe('string');
     expect(result).toContain('PAGE');
   });
 
   test('detects card-grid pattern', async ({ page }) => {
     await page.goto('/real-site-edges.html');
-    const result = await page.evaluate(() => __ps.pageMap());
+    const result = await page.evaluate(() => __ps.pageMap({ tree: true }));
     // Should detect the 3-column card grid
     expect(result).toMatch(/card-grid/i);
   });
 
   test('summary mode returns shorter output', async ({ page }) => {
     await page.goto('/real-site-edges.html');
-    const full = await page.evaluate(() => __ps.pageMap());
+    const full = await page.evaluate(() => __ps.pageMap({ tree: true }));
     const summary = await page.evaluate(() => __ps.pageMap({ summary: true }));
     expect(summary.length).toBeLessThan(full.length);
   });

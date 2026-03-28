@@ -1171,7 +1171,7 @@
   // === Tool: Palette Profile — design-system-level color identity ===
 
   function paletteProfile(opts) {
-    const o = Object.assign({ scope: 'body', maxElements: 5000, hex: false, format: 'data' }, opts);
+    const o = Object.assign({ scope: 'body', maxElements: 5000, hex: false, format: 'data', sources: false }, opts);
     const root = document.querySelector(o.scope) || document.body;
 
     // --- Phase 1: Extract all colors ---
@@ -1413,8 +1413,9 @@
         colors: colors.slice(0, 30).map(c => {
           const entry = {
             L: +(c.lch.L * 100).toFixed(1), C: +c.lch.C.toFixed(3), h: +c.lch.h.toFixed(1),
-            tone: colorTone(c.lch.L, c.lch.C, c.lch.h), count: c.count, sources: c.sources,
+            tone: colorTone(c.lch.L, c.lch.C, c.lch.h), count: c.count,
           };
+          if (o.sources) entry.sources = c.sources;
           if (o.hex) entry.hex = c.hex;
           return entry;
         }),
@@ -1443,7 +1444,9 @@
         const L = (c.lch.L * 100).toFixed(0);
         const C = c.lch.C.toFixed(3);
         const h = c.lch.h.toFixed(0);
-        lines.push(`  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]  ×${c.count}  (${c.sources.join(', ')})`);
+        let colorLine = `  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]  ×${c.count}`;
+        if (o.sources) colorLine += `  (${c.sources.join(', ')})`;
+        lines.push(colorLine);
       });
       lines.push('');
 
@@ -2352,7 +2355,7 @@
   // === Tool: Motion Profile ===
 
   function motionProfile(opts) {
-    const o = Object.assign({ scope: 'body', maxElements: 3000 }, opts);
+    const o = Object.assign({ scope: 'body', maxElements: 3000, detailed: false }, opts);
     const root = document.querySelector(o.scope) || document.body;
     const els = root.querySelectorAll('*');
 
@@ -2531,10 +2534,12 @@
 
     const data = {
       scanned,
-      animations,
-      transitions,
       summary,
     };
+    if (o.detailed) {
+      data.animations = animations;
+      data.transitions = transitions;
+    }
 
     if (o.format === 'text') {
       const lines = [];
@@ -2582,7 +2587,7 @@
   // === Tool: Page Map — topographic text layout of the page ===
 
   function pageMap(opts) {
-    const o = Object.assign({ scope: 'body', maxDepth: 8, foldWarnings: 'sections', patterns: true, summary: false, aboveFold: false }, opts);
+    const o = Object.assign({ scope: 'body', maxDepth: 8, foldWarnings: 'sections', patterns: true, summary: false, aboveFold: false, tree: false }, opts);
     const root = document.querySelector(o.scope) || document.body;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -2941,6 +2946,27 @@
     // --- Assemble output ---
 
     const tree = buildNode(root, 0);
+
+    // Flat landmark mode (default)
+    if (!o.tree && !o.summary && !o.aboveFold) {
+      if (!tree) return [];
+      const LANDMARKS = new Set(['nav','main','header','footer','section','article','aside','form','table','h1','h2','h3','h4','h5','h6']);
+      const landmarks = [];
+      function collectLandmarks(node, depth) {
+        const tag = node.label.split(/[#.\s\[]/)[0];
+        const hasRole = node.label.includes('[') && !node.label.includes('[grid') && !node.label.includes('[card-grid') && !node.label.includes('[carousel') && !node.label.includes('[accordion') && !node.label.includes('[sidebar') && !node.label.includes('[sticky-header') && !node.label.includes('[hero') && !node.label.includes('[nav]');
+        if (LANDMARKS.has(tag) || hasRole) {
+          landmarks.push({ tag, label: node.label, depth, spatial: node.spatial, childCount: node.children ? node.children.length : 0 });
+        }
+        if (node.children) {
+          for (const child of node.children) collectLandmarks(child, depth + 1);
+        }
+      }
+      const nodes = tree.children && tree.children.length > 0 ? tree.children : [tree];
+      for (const n of nodes) collectLandmarks(n, 0);
+      return landmarks;
+    }
+
     let header = 'PAGE ' + vw + '\u00d7' + vh;
     if (dark.isDark) header += ' [dark mode]';
 

@@ -1,7 +1,7 @@
   // === Tool: Palette Profile — design-system-level color identity ===
 
   function paletteProfile(opts) {
-    const o = Object.assign({ scope: 'body', maxElements: 5000, hex: false, format: 'data' }, opts);
+    const o = Object.assign({ scope: 'body', maxElements: 5000, hex: false, format: 'data', sources: false }, opts);
     const root = document.querySelector(o.scope) || document.body;
 
     // --- Phase 1: Extract all colors ---
@@ -243,8 +243,9 @@
         colors: colors.slice(0, 30).map(c => {
           const entry = {
             L: +(c.lch.L * 100).toFixed(1), C: +c.lch.C.toFixed(3), h: +c.lch.h.toFixed(1),
-            tone: colorTone(c.lch.L, c.lch.C, c.lch.h), count: c.count, sources: c.sources,
+            tone: colorTone(c.lch.L, c.lch.C, c.lch.h), count: c.count,
           };
+          if (o.sources) entry.sources = c.sources;
           if (o.hex) entry.hex = c.hex;
           return entry;
         }),
@@ -273,7 +274,9 @@
         const L = (c.lch.L * 100).toFixed(0);
         const C = c.lch.C.toFixed(3);
         const h = c.lch.h.toFixed(0);
-        lines.push(`  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]  ×${c.count}  (${c.sources.join(', ')})`);
+        let colorLine = `  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]  ×${c.count}`;
+        if (o.sources) colorLine += `  (${c.sources.join(', ')})`;
+        lines.push(colorLine);
       });
       lines.push('');
 

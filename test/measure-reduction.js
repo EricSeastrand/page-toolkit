@@ -25,6 +25,9 @@ const TOOLS = [
   ['gradientProfile', '__ps.gradientProfile()'],
   ['scrollAudit', '__ps.scrollAudit()'],
   ['touchTargets', '__ps.touchTargets()'],
+  ['motionProfile', '__ps.motionProfile()'],
+  ['pageMap', '__ps.pageMap()'],
+  ['paletteProfile', '__ps.paletteProfile()'],
   ['siteProfile', '__ps.siteProfile()'],
 ];
 

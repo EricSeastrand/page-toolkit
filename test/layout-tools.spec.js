@@ -4,26 +4,26 @@ const { expect } = require('@playwright/test');
 test.describe('pageMap', () => {
   test('returns a string with page structure', async ({ page }) => {
     await page.goto('/layout.html');
-    const result = await page.evaluate(() => __ps.pageMap());
+    const result = await page.evaluate(() => __ps.pageMap({ tree: true }));
     expect(typeof result).toBe('string');
     expect(result).toContain('hero');
   });
 
   test('includes fold marker', async ({ page }) => {
     await page.goto('/layout.html');
-    const result = await page.evaluate(() => __ps.pageMap());
+    const result = await page.evaluate(() => __ps.pageMap({ tree: true }));
     expect(result).toContain('fold');
   });
 
   test('detects layout patterns', async ({ page }) => {
     await page.goto('/layout.html');
-    const result = await page.evaluate(() => __ps.pageMap({ patterns: true }));
+    const result = await page.evaluate(() => __ps.pageMap({ patterns: true, tree: true }));
     expect(result).toMatch(/\[.*\]/); // pattern labels like [hero], [card-grid]
   });
 
   test('summary mode returns abbreviated output', async ({ page }) => {
     await page.goto('/layout.html');
-    const full = await page.evaluate(() => __ps.pageMap());
+    const full = await page.evaluate(() => __ps.pageMap({ tree: true }));
     const summary = await page.evaluate(() => __ps.pageMap({ summary: true }));
     expect(summary.length).toBeLessThan(full.length);
   });

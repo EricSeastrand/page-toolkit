@@ -1,7 +1,7 @@
   // === Tool: Motion Profile ===
 
   function motionProfile(opts) {
-    const o = Object.assign({ scope: 'body', maxElements: 3000 }, opts);
+    const o = Object.assign({ scope: 'body', maxElements: 3000, detailed: false }, opts);
     const root = document.querySelector(o.scope) || document.body;
     const els = root.querySelectorAll('*');
 
@@ -180,10 +180,12 @@
 
     const data = {
       scanned,
-      animations,
-      transitions,
       summary,
     };
+    if (o.detailed) {
+      data.animations = animations;
+      data.transitions = transitions;
+    }
 
     if (o.format === 'text') {
       const lines = [];

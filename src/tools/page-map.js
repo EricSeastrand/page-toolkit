@@ -1,7 +1,7 @@
   // === Tool: Page Map — topographic text layout of the page ===
 
   function pageMap(opts) {
-    const o = Object.assign({ scope: 'body', maxDepth: 8, foldWarnings: 'sections', patterns: true, summary: false, aboveFold: false }, opts);
+    const o = Object.assign({ scope: 'body', maxDepth: 8, foldWarnings: 'sections', patterns: true, summary: false, aboveFold: false, tree: false }, opts);
     const root = document.querySelector(o.scope) || document.body;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
@@ -360,6 +360,27 @@
     // --- Assemble output ---
 
     const tree = buildNode(root, 0);
+
+    // Flat landmark mode (default)
+    if (!o.tree && !o.summary && !o.aboveFold) {
+      if (!tree) return [];
+      const LANDMARKS = new Set(['nav','main','header','footer','section','article','aside','form','table','h1','h2','h3','h4','h5','h6']);
+      const landmarks = [];
+      function collectLandmarks(node, depth) {
+        const tag = node.label.split(/[#.\s\[]/)[0];
+        const hasRole = node.label.includes('[') && !node.label.includes('[grid') && !node.label.includes('[card-grid') && !node.label.includes('[carousel') && !node.label.includes('[accordion') && !node.label.includes('[sidebar') && !node.label.includes('[sticky-header') && !node.label.includes('[hero') && !node.label.includes('[nav]');
+        if (LANDMARKS.has(tag) || hasRole) {
+          landmarks.push({ tag, label: node.label, depth, spatial: node.spatial, childCount: node.children ? node.children.length : 0 });
+        }
+        if (node.children) {
+          for (const child of node.children) collectLandmarks(child, depth + 1);
+        }
+      }
+      const nodes = tree.children && tree.children.length > 0 ? tree.children : [tree];
+      for (const n of nodes) collectLandmarks(n, 0);
+      return landmarks;
+    }
+
     let header = 'PAGE ' + vw + '\u00d7' + vh;
     if (dark.isDark) header += ' [dark mode]';
 
