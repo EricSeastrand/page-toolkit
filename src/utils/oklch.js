@@ -62,15 +62,6 @@
     return Math.sqrt(dL * dL + dC * dC + dh * dh);
   }
 
-  // @deprecated — use colorTone(L, C, h) instead. Will be removed in Batch 2.
-  function chromaLabel(C) {
-    if (C < 0.02) return 'neutral';
-    if (C < 0.06) return 'tinted neutral';
-    if (C < 0.15) return 'moderate';
-    if (C < 0.25) return 'vivid';
-    return 'intense';
-  }
-
   function hueName(h) {
     if (h >= 350 || h < 20)  return 'pink';
     if (h < 45)  return 'red';

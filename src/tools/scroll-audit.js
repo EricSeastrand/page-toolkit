@@ -122,12 +122,10 @@
       items.push({
         path: elPath(el),
         tag: el.tagName.toLowerCase(),
-        classes: (typeof el.className === 'string' ? el.className : '').substring(0, 80),
         box: { w: Math.round(rect.width), h: Math.round(rect.height) },
         scrollDelta: { x: deltaX, y: deltaY },
         scrollable: { x: deltaX > 0, y: deltaY > 0 },
         position: pos,
-        styles: { maxHeight: maxH, overflowX: ovX, overflowY: ovY, touchAction: ta, overscrollBehavior: osb },
         isScroller,
         issueCount: issues.length,
         issues,
@@ -135,8 +133,7 @@
     }
 
     return {
-      viewport: { w: vw, h: vh },
-      page: { scrollable: pageScrollable, scrollDelta: pageDelta, scrollHeight: html.scrollHeight },
+      page: { scrollable: pageScrollable, scrollDelta: pageDelta },
       scanned: items.length,
       withIssues: items.filter(r => r.issueCount > 0).length,
       traps: traps.length > 0 ? traps : null,

@@ -44,7 +44,6 @@
         if (names.length > 0) {
           const hasTouch = names.some(n => n.startsWith('touch'));
           eventSummary = {
-            events: names,
             touchReady: hasTouch,
             mouseOnly: !hasTouch && names.some(n => ['mousedown', 'mouseup', 'click', 'mouseover'].includes(n)),
           };
@@ -68,7 +67,6 @@
     }
 
     return {
-      viewport: { w: vw, h: vh },
       count: targets.length,
       tooSmall: targets.filter(t => t.tooSmall).length,
       withWidgets: targets.filter(t => t.widget).length,

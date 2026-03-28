@@ -96,7 +96,7 @@
             L: +(lch.L * 100).toFixed(1),
             C: +lch.C.toFixed(3),
             h: +lch.h.toFixed(1),
-            label: chromaLabel(lch.C),
+            tone: colorTone(lch.L, lch.C, lch.h),
             alpha: rgb.a,
             position: posMatch ? posMatch[1] : null,
           });
@@ -113,7 +113,7 @@
         gradients.push({
           type: gradType,
           direction,
-          stops: stops.map(({ hex, L, C, h, label, position }) => ({ hex, L, C, h, label, position })),
+          stops: stops.map(({ hex, L, C, h, tone, position }) => ({ hex, L, C, h, tone, position })),
           path,
           classification,
         });
@@ -132,7 +132,11 @@
         sigMap.set(sig, { type: g.type, direction: g.direction, stops: g.stops, classification: g.classification, paths: [g.path] });
       }
     }
-    const deduped = [...sigMap.values()];
+    const deduped = [...sigMap.values()].map(g => {
+      g.pathCount = g.paths.length;
+      if (g.paths.length > 3) g.paths = g.paths.slice(0, 3);
+      return g;
+    });
 
     // Build summary counts (from original, pre-dedup)
     const summary = { linear: 0, radial: 0, conic: 0, overlay: 0, atmosphere: 0, functional: 0, separator: 0, total: gradients.length, unique: deduped.length };

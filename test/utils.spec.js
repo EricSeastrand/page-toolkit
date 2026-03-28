@@ -15,7 +15,6 @@ test.describe('_util exports', () => {
     expect(utils).toContain('rgbToOklch');
     expect(utils).toContain('oklchToRgb');
     expect(utils).toContain('deltaEOK');
-    expect(utils).toContain('chromaLabel');
     expect(utils).toContain('hueDistance');
     expect(utils).toContain('harmonyClass');
     expect(utils).toContain('effectiveBackground');
@@ -69,14 +68,4 @@ test.describe('_util exports', () => {
     expect(oklch.h).toBeLessThan(360);
   });
 
-  test('chromaLabel maps correctly', async ({ page }) => {
-    const labels = await page.evaluate(() => [
-      __ps._util.chromaLabel(0.01),
-      __ps._util.chromaLabel(0.04),
-      __ps._util.chromaLabel(0.10),
-      __ps._util.chromaLabel(0.20),
-      __ps._util.chromaLabel(0.30),
-    ]);
-    expect(labels).toEqual(['neutral', 'tinted neutral', 'moderate', 'vivid', 'intense']);
-  });
 });

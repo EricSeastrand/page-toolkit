@@ -191,7 +191,7 @@
   //   layoutDensity('.component', { axis: 'y' }) — vertical density of a single card
 
   function layoutDensity(selector, opts) {
-    const o = Object.assign({ depth: 3, axis: 'both', maxChildren: 50, mode: 'full' }, opts);
+    const o = Object.assign({ depth: 1, axis: 'both', maxChildren: 50, mode: 'full' }, opts);
     const root = document.querySelector(selector);
     if (!root) return { error: 'No element matches: ' + selector };
 
@@ -350,7 +350,7 @@
         const tf = measureTextFill(c.el, cr);
         if (tf.totalHeight > 0) {
           info.textFill = pct(tf.totalHeight, cr.height);
-          if (tf.textElements.length > 0) {
+          if (o.textElements && tf.textElements.length > 0) {
             info.textElements = tf.textElements;
           }
         }

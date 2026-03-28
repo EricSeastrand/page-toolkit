@@ -136,15 +136,6 @@
     return Math.sqrt(dL * dL + dC * dC + dh * dh);
   }
 
-  // @deprecated — use colorTone(L, C, h) instead. Will be removed in Batch 2.
-  function chromaLabel(C) {
-    if (C < 0.02) return 'neutral';
-    if (C < 0.06) return 'tinted neutral';
-    if (C < 0.15) return 'moderate';
-    if (C < 0.25) return 'vivid';
-    return 'intense';
-  }
-
   function hueName(h) {
     if (h >= 350 || h < 20)  return 'pink';
     if (h < 45)  return 'red';
@@ -859,7 +850,7 @@
   //   layoutDensity('.component', { axis: 'y' }) — vertical density of a single card
 
   function layoutDensity(selector, opts) {
-    const o = Object.assign({ depth: 3, axis: 'both', maxChildren: 50, mode: 'full' }, opts);
+    const o = Object.assign({ depth: 1, axis: 'both', maxChildren: 50, mode: 'full' }, opts);
     const root = document.querySelector(selector);
     if (!root) return { error: 'No element matches: ' + selector };
 
@@ -1018,7 +1009,7 @@
         const tf = measureTextFill(c.el, cr);
         if (tf.totalHeight > 0) {
           info.textFill = pct(tf.totalHeight, cr.height);
-          if (tf.textElements.length > 0) {
+          if (o.textElements && tf.textElements.length > 0) {
             info.textElements = tf.textElements;
           }
         }
@@ -1780,7 +1771,7 @@
             L: +(lch.L * 100).toFixed(1),
             C: +lch.C.toFixed(3),
             h: +lch.h.toFixed(1),
-            label: chromaLabel(lch.C),
+            tone: colorTone(lch.L, lch.C, lch.h),
             alpha: rgb.a,
             position: posMatch ? posMatch[1] : null,
           });
@@ -1797,7 +1788,7 @@
         gradients.push({
           type: gradType,
           direction,
-          stops: stops.map(({ hex, L, C, h, label, position }) => ({ hex, L, C, h, label, position })),
+          stops: stops.map(({ hex, L, C, h, tone, position }) => ({ hex, L, C, h, tone, position })),
           path,
           classification,
         });
@@ -1816,7 +1807,11 @@
         sigMap.set(sig, { type: g.type, direction: g.direction, stops: g.stops, classification: g.classification, paths: [g.path] });
       }
     }
-    const deduped = [...sigMap.values()];
+    const deduped = [...sigMap.values()].map(g => {
+      g.pathCount = g.paths.length;
+      if (g.paths.length > 3) g.paths = g.paths.slice(0, 3);
+      return g;
+    });
 
     // Build summary counts (from original, pre-dedup)
     const summary = { linear: 0, radial: 0, conic: 0, overlay: 0, atmosphere: 0, functional: 0, separator: 0, total: gradients.length, unique: deduped.length };
@@ -3178,12 +3173,10 @@
       items.push({
         path: elPath(el),
         tag: el.tagName.toLowerCase(),
-        classes: (typeof el.className === 'string' ? el.className : '').substring(0, 80),
         box: { w: Math.round(rect.width), h: Math.round(rect.height) },
         scrollDelta: { x: deltaX, y: deltaY },
         scrollable: { x: deltaX > 0, y: deltaY > 0 },
         position: pos,
-        styles: { maxHeight: maxH, overflowX: ovX, overflowY: ovY, touchAction: ta, overscrollBehavior: osb },
         isScroller,
         issueCount: issues.length,
         issues,
@@ -3191,8 +3184,7 @@
     }
 
     return {
-      viewport: { w: vw, h: vh },
-      page: { scrollable: pageScrollable, scrollDelta: pageDelta, scrollHeight: html.scrollHeight },
+      page: { scrollable: pageScrollable, scrollDelta: pageDelta },
       scanned: items.length,
       withIssues: items.filter(r => r.issueCount > 0).length,
       traps: traps.length > 0 ? traps : null,
@@ -3312,7 +3304,6 @@
         if (names.length > 0) {
           const hasTouch = names.some(n => n.startsWith('touch'));
           eventSummary = {
-            events: names,
             touchReady: hasTouch,
             mouseOnly: !hasTouch && names.some(n => ['mousedown', 'mouseup', 'click', 'mouseover'].includes(n)),
           };
@@ -3336,7 +3327,6 @@
     }
 
     return {
-      viewport: { w: vw, h: vh },
       count: targets.length,
       tooSmall: targets.filter(t => t.tooSmall).length,
       withWidgets: targets.filter(t => t.widget).length,
@@ -3860,6 +3850,6 @@
     gestureCapture,
     gestureResults,
     // Utility exports for ad-hoc use
-    _util: { parseRGB, hexFromRGB, luminance, contrast, saturation, effectiveBackground, elPath, detectDarkMode, boxModel, pctOfParent, interpolate, resolveEasing, EASING, rgbToOklab, oklabToOklch, rgbToOklch, oklchToRgb, deltaEOK, chromaLabel, hueName, colorTone, hueDistance, harmonyClass },
+    _util: { parseRGB, hexFromRGB, luminance, contrast, saturation, effectiveBackground, elPath, detectDarkMode, boxModel, pctOfParent, interpolate, resolveEasing, EASING, rgbToOklab, oklabToOklch, rgbToOklch, oklchToRgb, deltaEOK, hueName, colorTone, hueDistance, harmonyClass },
   };
 })();
