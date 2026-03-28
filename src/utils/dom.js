@@ -12,12 +12,12 @@
   function elPath(el, maxDepth) {
     const parts = [];
     let node = el;
-    const depth = maxDepth || 4;
+    const depth = maxDepth || 3;
     let foundId = false;
     while (node && node !== document.body && parts.length < depth) {
       let seg = node.tagName.toLowerCase();
       if (node.id) {
-        seg = `#${node.id}`;
+        seg += `#${node.id}`;
         parts.unshift(seg);
         foundId = true;
         break;
@@ -32,16 +32,16 @@
     if (!foundId && node && node !== document.body) {
       while (node && node !== document.body) {
         if (node.id) {
-          parts.unshift(`#${node.id}`);
+          parts.unshift(`${node.tagName.toLowerCase()}#${node.id}`);
           foundId = true;
           break;
         }
         node = node.parentElement;
       }
     }
-    // If still no id, trim to last 3 segments
-    if (!foundId && parts.length > 3) {
-      parts.splice(0, parts.length - 3);
+    // If still no id, trim to last 2 segments
+    if (!foundId && parts.length > 2) {
+      parts.splice(0, parts.length - 2);
     }
     return parts.join(' > ');
   }
