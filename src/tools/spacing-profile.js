@@ -105,7 +105,11 @@
         }
       }
     }
-    const allGridFlexGaps = [...gridFlexGapMap.values()];
+    const allGridFlexGaps = [...gridFlexGapMap.values()].map(g => {
+      g.pathCount = g.paths.length;
+      if (g.paths.length > 3) g.paths = g.paths.slice(0, 3);
+      return g;
+    });
     const totalGaps = allGridFlexGaps.length;
     const gridFlexGaps = allGridFlexGaps.slice(0, 5);
 
@@ -170,7 +174,7 @@
         if (g.gap) parts.push('gap:' + g.gap + 'px');
         if (g.rowGap && g.rowGap !== g.gap) parts.push('row-gap:' + g.rowGap + 'px');
         if (g.columnGap && g.columnGap !== g.gap) parts.push('col-gap:' + g.columnGap + 'px');
-        const count = g.paths.length;
+        const count = g.pathCount;
         if (count <= 2) {
           lines.push('  ' + parts.join(' ') + '  ' + g.paths.join(', '));
         } else {

@@ -20,6 +20,7 @@
     }
 
     // CSS custom properties from all stylesheets
+    let blockedSheets = 0;
     try {
       const rootStyles = getComputedStyle(document.documentElement);
       const bodyStyles = getComputedStyle(document.body);
@@ -38,7 +39,7 @@
               }
             }
           }
-        } catch(e) { /* cross-origin stylesheet */ }
+        } catch(e) { blockedSheets++; }
       }
     } catch(e) { /* stylesheet access error */ }
 
@@ -233,6 +234,7 @@
         totalColors: colors.length,
         scanned,
         tokenCount: tokenColors.length,
+        blockedSheets,
         hueGroups: hueGroups.length,
         harmony,
         lightnessShape,

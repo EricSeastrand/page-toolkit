@@ -50,7 +50,12 @@
     const s = window.getComputedStyle(el);
     if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false;
     const r = el.getBoundingClientRect();
-    return r.width > 0 || r.height > 0;
+    if (r.width <= 0 && r.height <= 0) return false;
+    // Detect sr-only / visually-hidden patterns
+    if (s.clip === 'rect(0px, 0px, 0px, 0px)' || s.clip === 'rect(0px 0px 0px 0px)') return false;
+    if (s.clipPath === 'inset(50%)') return false;
+    if (s.position === 'absolute' && r.width <= 1 && r.height <= 1 && s.overflow === 'hidden') return false;
+    return true;
   }
 
   // === Page detection ===

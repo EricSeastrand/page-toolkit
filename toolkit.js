@@ -288,7 +288,12 @@
     const s = window.getComputedStyle(el);
     if (s.display === 'none' || s.visibility === 'hidden' || +s.opacity === 0) return false;
     const r = el.getBoundingClientRect();
-    return r.width > 0 || r.height > 0;
+    if (r.width <= 0 && r.height <= 0) return false;
+    // Detect sr-only / visually-hidden patterns
+    if (s.clip === 'rect(0px, 0px, 0px, 0px)' || s.clip === 'rect(0px 0px 0px 0px)') return false;
+    if (s.clipPath === 'inset(50%)') return false;
+    if (s.position === 'absolute' && r.width <= 1 && r.height <= 1 && s.overflow === 'hidden') return false;
+    return true;
   }
 
   // === Page detection ===
@@ -1190,6 +1195,7 @@
     }
 
     // CSS custom properties from all stylesheets
+    let blockedSheets = 0;
     try {
       const rootStyles = getComputedStyle(document.documentElement);
       const bodyStyles = getComputedStyle(document.body);
@@ -1208,7 +1214,7 @@
               }
             }
           }
-        } catch(e) { /* cross-origin stylesheet */ }
+        } catch(e) { blockedSheets++; }
       }
     } catch(e) { /* stylesheet access error */ }
 
@@ -1403,6 +1409,7 @@
         totalColors: colors.length,
         scanned,
         tokenCount: tokenColors.length,
+        blockedSheets,
         hueGroups: hueGroups.length,
         harmony,
         lightnessShape,
@@ -1981,7 +1988,11 @@
         }
       }
     }
-    const allGridFlexGaps = [...gridFlexGapMap.values()];
+    const allGridFlexGaps = [...gridFlexGapMap.values()].map(g => {
+      g.pathCount = g.paths.length;
+      if (g.paths.length > 3) g.paths = g.paths.slice(0, 3);
+      return g;
+    });
     const totalGaps = allGridFlexGaps.length;
     const gridFlexGaps = allGridFlexGaps.slice(0, 5);
 
@@ -2046,7 +2057,7 @@
         if (g.gap) parts.push('gap:' + g.gap + 'px');
         if (g.rowGap && g.rowGap !== g.gap) parts.push('row-gap:' + g.rowGap + 'px');
         if (g.columnGap && g.columnGap !== g.gap) parts.push('col-gap:' + g.columnGap + 'px');
-        const count = g.paths.length;
+        const count = g.pathCount;
         if (count <= 2) {
           lines.push('  ' + parts.join(' ') + '  ' + g.paths.join(', '));
         } else {
