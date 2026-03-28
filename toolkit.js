@@ -385,14 +385,14 @@
     const topFg = Object.values(fgColors).sort((a, b) => b.count - a.count).slice(0, 8)
       .map(c => {
         const lch = rgbToOklch(c.rgb.r, c.rgb.g, c.rgb.b);
-        const entry = { count: c.count, oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, tone: colorTone(lch.L * 100, lch.C, lch.h) };
+        const entry = { count: c.count, oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, tone: colorTone(lch.L, lch.C, lch.h) };
         if (o.hex) entry.hex = hexFromRGB(c.rgb);
         return entry;
       });
     const topBg = Object.values(bgColors).sort((a, b) => b.count - a.count).slice(0, 5)
       .map(c => {
         const lch = rgbToOklch(c.rgb.r, c.rgb.g, c.rgb.b);
-        const entry = { count: c.count, oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, tone: colorTone(lch.L * 100, lch.C, lch.h) };
+        const entry = { count: c.count, oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, tone: colorTone(lch.L, lch.C, lch.h) };
         if (o.hex) entry.hex = hexFromRGB(c.rgb);
         return entry;
       });
