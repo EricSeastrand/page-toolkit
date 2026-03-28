@@ -1,8 +1,8 @@
 # Thread: Signal/Noise Improvement
 
-**Last updated:** 2026-03-27
-**Status:** Batches 1-5 complete. All planned noise reduction implemented.
-**Handoff:** `memories/handoff-noise-batch5.md` (Batch 5 plan + results), `memories/handoff-signal-noise.md` (Batches 1-3)
+**Last parked:** 2026-03-27
+**Status:** Batches 1-5 complete. One remaining item: elPath() shortening (rec #8).
+**Handoff:** `memories/handoff-elpath-shortening.md` (next step), `memories/handoff-noise-batch5.md` (Batch 5), `memories/handoff-signal-noise.md` (Batches 1-3)
 
 ## Batch 5 results (2026-03-27)
 
@@ -18,9 +18,7 @@ Changes:
 - **paletteProfile**: `sources` dropped from color entries by default, `opts.sources` to opt in
 
 ## Key files
-- `src/utils/oklch.js` — colorTone(), hueName() (chromaLabel removed in Batch 4)
-- `src/tools/motion-profile.js` — Batch 5 Unit A
-- `src/tools/page-map.js` — Batch 5 Unit B
-- `src/tools/palette-profile.js` — Batch 5 Unit C
+- `src/utils/dom.js` — contains `elPath()`, next change target
+- `src/utils/oklch.js` — colorTone(), hueName()
 - `test/measure-reduction.js` — live-site comparison script
-- `docs/signal-noise-recommendations.md` — original analysis of all 26 tools
+- `docs/signal-noise-recommendations.md` — original analysis (rec #8 is next)
