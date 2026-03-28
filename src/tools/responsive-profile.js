@@ -112,49 +112,52 @@
     const uniqueValues = new Set(breakpoints.map(b => b.value)).size;
     const mostUsed = breakpoints.length ? breakpoints.reduce((a, b) => a.ruleCount >= b.ruleCount ? a : b) : null;
 
-    const lines = [];
-    lines.push('Responsive Profile \u2014 ' + sheetsTotal + ' stylesheets (' + sheetsAccessible + ' accessible, ' + sheetsBlocked + ' blocked by CORS)');
-    lines.push('');
-
-    if (breakpoints.length) {
-      lines.push('Breakpoints (' + uniqueValues + ' unique values):');
-      for (const bp of breakpoints) {
-        const props = bp.topProperties.length ? bp.topProperties.join(', ') : '';
-        lines.push('  ' + String(bp.value).padStart(5) + 'px  (' + bp.direction + '-' + bp.dimension + ') \u2014 ' + String(bp.ruleCount).padStart(3) + ' rules  [' + bp.tier + ']' + (props ? '   ' + props : ''));
-      }
-      lines.push('');
-
-      lines.push('Tier summary:');
-      for (const [name, tier] of Object.entries(tiers)) {
-        if (tier.breakpoints.length) {
-          lines.push('  ' + name + ':  ' + tier.breakpoints.length + ' breakpoint' + (tier.breakpoints.length > 1 ? 's' : '') + ', ' + tier.totalRules + ' rules');
-        }
-      }
-      lines.push('');
-
-      if (topProperties.length) {
-        lines.push('Most changed properties: ' + topProperties.map(([p, c]) => p + ' (' + c + ' breakpoints)').join(', '));
-      }
-    } else {
-      lines.push('No @media breakpoints found in accessible stylesheets.');
-    }
-
-    return {
-      text: lines.join('\n'),
-      data: {
-        sheetsTotal,
-        sheetsAccessible,
-        sheetsBlocked,
-        breakpoints,
-        tiers,
-        summary: {
-          totalBreakpoints: breakpoints.length,
-          uniqueValues,
-          mostUsedBreakpoint: mostUsed ? mostUsed.value : null,
-          topProperties: topProperties.map(([p, c]) => ({ property: p, breakpointCount: c })),
-        },
+    const data = {
+      sheetsTotal,
+      sheetsAccessible,
+      sheetsBlocked,
+      breakpoints,
+      tiers,
+      summary: {
+        totalBreakpoints: breakpoints.length,
+        uniqueValues,
+        mostUsedBreakpoint: mostUsed ? mostUsed.value : null,
+        topProperties: topProperties.map(([p, c]) => ({ property: p, breakpointCount: c })),
       },
     };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push('Responsive Profile \u2014 ' + sheetsTotal + ' stylesheets (' + sheetsAccessible + ' accessible, ' + sheetsBlocked + ' blocked by CORS)');
+      lines.push('');
+
+      if (breakpoints.length) {
+        lines.push('Breakpoints (' + uniqueValues + ' unique values):');
+        for (const bp of breakpoints) {
+          const props = bp.topProperties.length ? bp.topProperties.join(', ') : '';
+          lines.push('  ' + String(bp.value).padStart(5) + 'px  (' + bp.direction + '-' + bp.dimension + ') \u2014 ' + String(bp.ruleCount).padStart(3) + ' rules  [' + bp.tier + ']' + (props ? '   ' + props : ''));
+        }
+        lines.push('');
+
+        lines.push('Tier summary:');
+        for (const [name, tier] of Object.entries(tiers)) {
+          if (tier.breakpoints.length) {
+            lines.push('  ' + name + ':  ' + tier.breakpoints.length + ' breakpoint' + (tier.breakpoints.length > 1 ? 's' : '') + ', ' + tier.totalRules + ' rules');
+          }
+        }
+        lines.push('');
+
+        if (topProperties.length) {
+          lines.push('Most changed properties: ' + topProperties.map(([p, c]) => p + ' (' + c + ' breakpoints)').join(', '));
+        }
+      } else {
+        lines.push('No @media breakpoints found in accessible stylesheets.');
+      }
+
+      return { text: lines.join('\n'), data };
+    }
+
+    return data;
   }
 
 

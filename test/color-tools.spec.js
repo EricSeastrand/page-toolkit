@@ -29,25 +29,31 @@ test.describe('paletteProfile', () => {
     await page.goto('/color.html');
   });
 
-  test('returns text and data', async ({ page }) => {
+  test('returns data object by default', async ({ page }) => {
     const result = await page.evaluate(() => __ps.paletteProfile());
+    expect(result.colors).toBeDefined();
+    expect(result.harmony).toBeDefined();
+  });
+
+  test('returns text and data with format opt-in', async ({ page }) => {
+    const result = await page.evaluate(() => __ps.paletteProfile({ format: 'text' }));
     expect(result.text).toBeTruthy();
     expect(result.data).toBeDefined();
   });
 
   test('finds CSS custom properties as design tokens', async ({ page }) => {
     const result = await page.evaluate(() => __ps.paletteProfile());
-    expect(result.data.tokenCount).toBeGreaterThanOrEqual(4);
+    expect(result.tokenCount).toBeGreaterThanOrEqual(4);
   });
 
   test('detects harmony classification', async ({ page }) => {
     const result = await page.evaluate(() => __ps.paletteProfile());
-    expect(result.data.harmony).toBeTruthy();
+    expect(result.harmony).toBeTruthy();
   });
 
   test('reports OKLCH values for colors', async ({ page }) => {
     const result = await page.evaluate(() => __ps.paletteProfile());
-    const colors = result.data.colors;
+    const colors = result.colors;
     expect(colors.length).toBeGreaterThan(0);
     const first = colors[0];
     expect(first.L).toBeGreaterThanOrEqual(0);

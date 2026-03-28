@@ -105,7 +105,26 @@
         }
       }
     }
-    const gridFlexGaps = [...gridFlexGapMap.values()];
+    const allGridFlexGaps = [...gridFlexGapMap.values()];
+    const totalGaps = allGridFlexGaps.length;
+    const gridFlexGaps = allGridFlexGaps.slice(0, 5);
+
+    const data = {
+      scanned,
+      baseUnit,
+      baseUnitCoverage,
+      scale,
+      byType: {
+        padding: Object.fromEntries(padding),
+        margin: Object.fromEntries(margin),
+        gap: Object.fromEntries(gapMap),
+      },
+      sectionRhythm,
+      gridFlexGaps,
+      totalGaps,
+    };
+
+    if (o.format !== 'text') return data;
 
     function fmtFreq(map, limit) {
       return [...map.entries()]
@@ -145,8 +164,8 @@
     }
 
     if (gridFlexGaps.length) {
-      lines.push('Grid/flex gaps:');
-      for (const g of gridFlexGaps.slice(0, 15)) {
+      lines.push('Grid/flex gaps (' + totalGaps + ' total):');
+      for (const g of gridFlexGaps) {
         const parts = [g.display];
         if (g.gap) parts.push('gap:' + g.gap + 'px');
         if (g.rowGap && g.rowGap !== g.gap) parts.push('row-gap:' + g.rowGap + 'px');
@@ -162,19 +181,7 @@
 
     return {
       text: lines.join('\n'),
-      data: {
-        scanned,
-        baseUnit,
-        baseUnitCoverage,
-        scale,
-        byType: {
-          padding: Object.fromEntries(padding),
-          margin: Object.fromEntries(margin),
-          gap: Object.fromEntries(gapMap),
-        },
-        sectionRhythm,
-        gridFlexGaps,
-      },
+      data,
     };
   }
 

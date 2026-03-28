@@ -149,45 +149,46 @@
       for (const s of g.stops) uniqueHexes.add(s.hex);
     }
 
-    // Build text report
-    const lines = [];
-    lines.push(`Gradient Profile — ${gradients.length} gradients found, ${deduped.length} unique (scanned ${scanned} elements)`);
-    lines.push('');
-    lines.push('By type:');
-    if (summary.linear) lines.push(`  linear-gradient: ${summary.linear}`);
-    if (summary.radial) lines.push(`  radial-gradient: ${summary.radial}`);
-    if (summary.conic) lines.push(`  conic-gradient: ${summary.conic}`);
-    lines.push('');
-    lines.push('By classification:');
-    for (const cls of ['atmosphere', 'overlay', 'functional', 'separator']) {
-      if (summary[cls]) lines.push(`  ${cls}: ${summary[cls]}`);
-    }
-    lines.push('');
-    lines.push(`Unique colors in gradient stops: ${uniqueHexes.size}`);
-    if (bgImageCount > 0) {
-      lines.push(`Background images (url()): ${bgImageCount}${bgImageSample ? ' — sample: ' + bgImageSample : ''}`);
-    }
-    lines.push('');
-    for (const g of deduped) {
-      const stopStr = g.stops.map(s => s.hex + (s.position ? ' ' + s.position : '')).join(' → ');
-      lines.push(`  ${g.type}${g.direction ? ' ' + g.direction : ''}: ${stopStr} [${g.classification}] ×${g.paths.length}`);
-      if (g.paths.length <= 3) {
-        for (const p of g.paths) lines.push(`    ${p}`);
-      } else {
-        lines.push(`    ${g.paths[0]} … +${g.paths.length - 1} more`);
+    const data = {
+      scanned,
+      gradients: deduped,
+      bgImageCount,
+      bgImageSamplePath: bgImageSample,
+      summary,
+    };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push(`Gradient Profile — ${gradients.length} gradients found, ${deduped.length} unique (scanned ${scanned} elements)`);
+      lines.push('');
+      lines.push('By type:');
+      if (summary.linear) lines.push(`  linear-gradient: ${summary.linear}`);
+      if (summary.radial) lines.push(`  radial-gradient: ${summary.radial}`);
+      if (summary.conic) lines.push(`  conic-gradient: ${summary.conic}`);
+      lines.push('');
+      lines.push('By classification:');
+      for (const cls of ['atmosphere', 'overlay', 'functional', 'separator']) {
+        if (summary[cls]) lines.push(`  ${cls}: ${summary[cls]}`);
       }
+      lines.push('');
+      lines.push(`Unique colors in gradient stops: ${uniqueHexes.size}`);
+      if (bgImageCount > 0) {
+        lines.push(`Background images (url()): ${bgImageCount}${bgImageSample ? ' — sample: ' + bgImageSample : ''}`);
+      }
+      lines.push('');
+      for (const g of deduped) {
+        const stopStr = g.stops.map(s => s.hex + (s.position ? ' ' + s.position : '')).join(' → ');
+        lines.push(`  ${g.type}${g.direction ? ' ' + g.direction : ''}: ${stopStr} [${g.classification}] ×${g.paths.length}`);
+        if (g.paths.length <= 3) {
+          for (const p of g.paths) lines.push(`    ${p}`);
+        } else {
+          lines.push(`    ${g.paths[0]} … +${g.paths.length - 1} more`);
+        }
+      }
+      return { text: lines.join('\n'), data };
     }
 
-    return {
-      text: lines.join('\n'),
-      data: {
-        scanned,
-        gradients: deduped,
-        bgImageCount,
-        bgImageSamplePath: bgImageSample,
-        summary,
-      },
-    };
+    return data;
   }
 
 

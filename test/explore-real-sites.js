@@ -113,22 +113,12 @@ function summarize(name, result) {
   if (typeof result === 'string') return { length: result.length, preview: result.slice(0, 200) };
   if (typeof result !== 'object') return result;
 
-  // For tools returning { text, data }
+  // For tools still returning { text, data } (e.g. siteProfile with format: 'text')
   if (result.text && result.data) {
     const data = result.data;
     return {
       textLength: result.text.length,
       dataKeys: Object.keys(data),
-      // Pull interesting stats
-      ...(data.totalColors !== undefined && { totalColors: data.totalColors }),
-      ...(data.harmony && { harmony: data.harmony }),
-      ...(data.families && { familyCount: data.families.length }),
-      ...(data.gradients && { gradientCount: data.gradients.length }),
-      ...(data.baseUnit !== undefined && { baseUnit: data.baseUnit }),
-      ...(data.breakpoints && { breakpointCount: data.breakpoints.length }),
-      ...(data.animations && { animationCount: data.animations.length }),
-      ...(data.transitions && { transitionCount: data.transitions.length }),
-      ...(data.colors && { colorCount: data.colors.length }),
     };
   }
 

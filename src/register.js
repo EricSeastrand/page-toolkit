@@ -35,5 +35,5 @@
     gestureCapture,
     gestureResults,
     // Utility exports for ad-hoc use
-    _util: { parseRGB, hexFromRGB, luminance, contrast, saturation, effectiveBackground, elPath, detectDarkMode, boxModel, pctOfParent, interpolate, resolveEasing, EASING, rgbToOklab, oklabToOklch, rgbToOklch, oklchToRgb, deltaEOK, chromaLabel, hueDistance, harmonyClass },
+    _util: { parseRGB, hexFromRGB, luminance, contrast, saturation, effectiveBackground, elPath, detectDarkMode, boxModel, pctOfParent, interpolate, resolveEasing, EASING, rgbToOklab, oklabToOklch, rgbToOklch, oklchToRgb, deltaEOK, chromaLabel, hueName, colorTone, hueDistance, harmonyClass },
   };

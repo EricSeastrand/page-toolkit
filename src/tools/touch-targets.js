@@ -58,13 +58,9 @@
         text: (el.textContent || '').trim().substring(0, 40) || null,
         widget,
         box: {
-          x: Math.round(rect.x), y: Math.round(rect.y),
           w: Math.round(rect.width), h: Math.round(rect.height),
-          // Viewport-percentage position for gesture planning
-          xPct: +(rect.x / vw * 100).toFixed(1),
-          yPct: +(rect.y / vh * 100).toFixed(1),
-          centerXPct: +((rect.x + rect.width / 2) / vw * 100).toFixed(1),
-          centerYPct: +((rect.y + rect.height / 2) / vh * 100).toFixed(1),
+          cx: +((rect.x + rect.width / 2) / vw * 100).toFixed(1),
+          cy: +((rect.y + rect.height / 2) / vh * 100).toFixed(1),
         },
         tooSmall,
         events: eventSummary,
@@ -77,7 +73,7 @@
       tooSmall: targets.filter(t => t.tooSmall).length,
       withWidgets: targets.filter(t => t.widget).length,
       mouseOnly: targets.filter(t => t.events?.mouseOnly).length,
-      targets,
+      targets: o.all ? targets : targets.filter(t => t.tooSmall),
     };
   }
 

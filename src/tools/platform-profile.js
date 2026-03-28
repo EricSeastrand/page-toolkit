@@ -1,14 +1,16 @@
   // === platformProfile: CMS, libraries, meta tags, analytics ===
 
-  function platformProfile() {
+  function platformProfile(opts) {
+    opts = opts || {};
+    const wantText = opts.format === 'text';
     const data = { cms: null, theme: null, generator: null, libraries: [], analytics: [], meta: {} };
-    const lines = [];
+    const lines = wantText ? [] : null;
 
     // Meta generator tag
     const gen = document.querySelector('meta[name="generator"]');
     if (gen) {
       data.generator = gen.content;
-      lines.push('Generator: ' + gen.content);
+      if (wantText) lines.push('Generator: ' + gen.content);
     }
 
     // Shopify detection
@@ -17,7 +19,7 @@
       if (window.Shopify.theme) {
         data.theme = { name: window.Shopify.theme.name, id: window.Shopify.theme.id, role: window.Shopify.theme.role };
       }
-      lines.push('CMS: Shopify' + (data.theme ? ' (' + data.theme.name + ', ' + data.theme.role + ')' : ''));
+      if (wantText) lines.push('CMS: Shopify' + (data.theme ? ' (' + data.theme.name + ', ' + data.theme.role + ')' : ''));
     }
 
     // WordPress detection
@@ -27,22 +29,22 @@
       data.cms = data.cms || 'WordPress';
       const wpGen = document.querySelector('meta[name="generator"][content*="WordPress"]');
       if (wpGen) data.generator = wpGen.content;
-      lines.push('CMS: WordPress' + (data.generator ? ' (' + data.generator + ')' : ''));
+      if (wantText) lines.push('CMS: WordPress' + (data.generator ? ' (' + data.generator + ')' : ''));
     }
 
     // Squarespace
     if (window.Static?.SQUARESPACE_CONTEXT || document.querySelector('meta[name="generator"][content*="Squarespace"]')) {
       data.cms = data.cms || 'Squarespace';
-      lines.push('CMS: Squarespace');
+      if (wantText) lines.push('CMS: Squarespace');
     }
 
     // Wix
     if (document.querySelector('meta[name="generator"][content*="Wix"]') || window.wixBiSession) {
       data.cms = data.cms || 'Wix';
-      lines.push('CMS: Wix');
+      if (wantText) lines.push('CMS: Wix');
     }
 
-    if (!data.cms) lines.push('CMS: not detected');
+    if (!data.cms && wantText) lines.push('CMS: not detected');
 
     // JS library detection
     const libs = [];
@@ -60,7 +62,7 @@
     if (window.bootstrap) libs.push('Bootstrap');
     if (window.tailwind || document.querySelector('link[href*="tailwind"], script[src*="tailwind"]')) libs.push('Tailwind CSS');
     data.libraries = libs;
-    if (libs.length) lines.push('Libraries: ' + libs.join(', '));
+    if (libs.length && wantText) lines.push('Libraries: ' + libs.join(', '));
 
     // Cookie consent / CMP
     const cmps = [];
@@ -71,7 +73,7 @@
     if (document.querySelector('[class*="cookie-banner"], [id*="cookie-banner"], [class*="consent"]')) cmps.push('cookie banner (DOM)');
     if (cmps.length) {
       data.cookieConsent = cmps;
-      lines.push('Cookie consent: ' + cmps.join(', '));
+      if (wantText) lines.push('Cookie consent: ' + cmps.join(', '));
     }
 
     // Analytics / tracking pixels by script src and known globals
@@ -115,7 +117,7 @@
     if (window.hj) analyticsMap.set('Hotjar', true);
 
     data.analytics = [...analyticsMap.keys()];
-    if (data.analytics.length) {
+    if (data.analytics.length && wantText) {
       lines.push('');
       lines.push('Integrations (' + data.analytics.length + '):');
       for (const a of data.analytics) lines.push('  ' + a);
@@ -127,7 +129,7 @@
       const el = document.querySelector('meta[name="' + name + '"], meta[property="' + name + '"]');
       if (el) data.meta[name] = el.content;
     }
-    if (Object.keys(data.meta).length) {
+    if (Object.keys(data.meta).length && wantText) {
       lines.push('');
       lines.push('Meta:');
       for (const [k, v] of Object.entries(data.meta)) {
@@ -135,7 +137,8 @@
       }
     }
 
-    return { text: lines.join('\n'), data };
+    if (wantText) return { text: lines.join('\n'), data };
+    return data;
   }
 
 

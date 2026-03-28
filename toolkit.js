@@ -136,12 +136,73 @@
     return Math.sqrt(dL * dL + dC * dC + dh * dh);
   }
 
+  // @deprecated — use colorTone(L, C, h) instead. Will be removed in Batch 2.
   function chromaLabel(C) {
     if (C < 0.02) return 'neutral';
     if (C < 0.06) return 'tinted neutral';
     if (C < 0.15) return 'moderate';
     if (C < 0.25) return 'vivid';
     return 'intense';
+  }
+
+  function hueName(h) {
+    if (h >= 350 || h < 20)  return 'pink';
+    if (h < 45)  return 'red';
+    if (h < 70)  return 'orange';
+    if (h < 100) return 'yellow';
+    if (h < 130) return 'lime';
+    if (h < 160) return 'green';
+    if (h < 190) return 'teal';
+    if (h < 225) return 'cyan';
+    if (h < 260) return 'blue';
+    if (h < 290) return 'indigo';
+    return 'purple';
+  }
+
+  function colorTone(L, C, h) {
+    // Pure neutrals — no hue, describe by lightness only
+    if (C < 0.01) {
+      if (L >= 0.94) return 'white';
+      if (L >= 0.75) return 'light gray';
+      if (L >= 0.45) return 'gray';
+      if (L >= 0.25) return 'dark gray';
+      return 'black';
+    }
+
+    const hue = hueName(h);
+
+    // Tinted neutrals — noun is the neutral, hue is the adjective
+    if (C < 0.04) {
+      if (L >= 0.85) return hue + '-ish white';
+      if (L >= 0.35) return hue + '-ish gray';
+      return hue + '-ish black';
+    }
+
+    // Muted accents — noun is the hue, grayness is the adjective
+    if (C < 0.08) {
+      if (L >= 0.75) return 'pale ' + hue;
+      if (L >= 0.35) return 'grayish ' + hue;
+      return 'dark grayish ' + hue;
+    }
+
+    // Chromatic — ISCC-NBS modifiers selected by L and CIE saturation (C/L)
+    var s = L > 0.01 ? C / L : 0;
+
+    if (L >= 0.75) {
+      if (s >= 0.25) return 'vivid ' + hue;
+      if (s >= 0.12) return 'brilliant ' + hue;
+      return 'light ' + hue;
+    }
+    if (L >= 0.55) {
+      if (s >= 0.25) return 'strong ' + hue;
+      return 'moderate ' + hue;
+    }
+    if (L >= 0.35) {
+      if (s >= 0.25) return 'deep ' + hue;
+      return 'moderate ' + hue;
+    }
+    if (s >= 0.25) return 'deep ' + hue;
+    return 'dark ' + hue;
   }
 
   function hueDistance(h1, h2) {
@@ -199,15 +260,35 @@
     const parts = [];
     let node = el;
     const depth = maxDepth || 4;
+    let foundId = false;
     while (node && node !== document.body && parts.length < depth) {
-      let id = node.tagName.toLowerCase();
-      if (node.id) id += `#${node.id}`;
-      else if (node.className && typeof node.className === 'string') {
+      let seg = node.tagName.toLowerCase();
+      if (node.id) {
+        seg = `#${node.id}`;
+        parts.unshift(seg);
+        foundId = true;
+        break;
+      } else if (node.className && typeof node.className === 'string') {
         const c = node.className.trim().split(/\s+/).slice(0, 2).join('.');
-        if (c) id += `.${c}`;
+        if (c) seg += `.${c}`;
       }
-      parts.unshift(id);
+      parts.unshift(seg);
       node = node.parentElement;
+    }
+    // If no id anchor found, walk further up looking for an ancestor with an id
+    if (!foundId && node && node !== document.body) {
+      while (node && node !== document.body) {
+        if (node.id) {
+          parts.unshift(`#${node.id}`);
+          foundId = true;
+          break;
+        }
+        node = node.parentElement;
+      }
+    }
+    // If still no id, trim to last 3 segments
+    if (!foundId && parts.length > 3) {
+      parts.splice(0, parts.length - 3);
     }
     return parts.join(' > ');
   }
@@ -260,8 +341,8 @@
 
     // Collect all fg/bg pairs
     const pairs = [];      // { fg, bg, fgLum, bgLum, ratio, path, tag }
-    const bgColors = {};   // colorKey -> { rgb, count, lum, sat }
-    const fgColors = {};   // colorKey -> { rgb, count, lum, sat }
+    const bgColors = {};   // colorKey -> { rgb, count, lum }
+    const fgColors = {};   // colorKey -> { rgb, count, lum }
     let scanned = 0;
 
     const candidates = root.querySelectorAll('*');
@@ -295,18 +376,16 @@
 
       // Track unique colors
       const fk = colorKey(fg);
-      if (!fgColors[fk]) fgColors[fk] = { rgb: fg, count: 0, lum: fgLum, sat: saturation(fg) };
+      if (!fgColors[fk]) fgColors[fk] = { rgb: fg, count: 0, lum: fgLum };
       fgColors[fk].count++;
 
       const bk = colorKey(bg);
-      if (!bgColors[bk]) bgColors[bk] = { rgb: bg, count: 0, lum: bgLum, sat: saturation(bg) };
+      if (!bgColors[bk]) bgColors[bk] = { rgb: bg, count: 0, lum: bgLum };
       bgColors[bk].count++;
     }
 
     // Compute distributions
     const ratios = pairs.map(p => p.ratio).sort((a, b) => a - b);
-    const fgLums = pairs.map(p => p.fgLum).sort((a, b) => a - b);
-    const bgLums = [...new Set(Object.values(bgColors).map(c => c.lum))].sort((a, b) => a - b);
 
     function percentile(arr, p) { return arr[Math.floor(arr.length * p)] || 0; }
     function avg(arr) { return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0; }
@@ -315,12 +394,16 @@
     const topFg = Object.values(fgColors).sort((a, b) => b.count - a.count).slice(0, 8)
       .map(c => {
         const lch = rgbToOklch(c.rgb.r, c.rgb.g, c.rgb.b);
-        return { color: rgbString(c.rgb), hex: hexFromRGB(c.rgb), count: c.count, luminance: +c.lum.toFixed(3), saturation: +c.sat.toFixed(3), oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, chroma: chromaLabel(lch.C) };
+        const entry = { count: c.count, oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, tone: colorTone(lch.L * 100, lch.C, lch.h) };
+        if (o.hex) entry.hex = hexFromRGB(c.rgb);
+        return entry;
       });
     const topBg = Object.values(bgColors).sort((a, b) => b.count - a.count).slice(0, 5)
       .map(c => {
         const lch = rgbToOklch(c.rgb.r, c.rgb.g, c.rgb.b);
-        return { color: rgbString(c.rgb), hex: hexFromRGB(c.rgb), count: c.count, luminance: +c.lum.toFixed(3), saturation: +c.sat.toFixed(3), oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, chroma: chromaLabel(lch.C) };
+        const entry = { count: c.count, oklch: { L: +(lch.L * 100).toFixed(1), C: +lch.C.toFixed(3), h: +lch.h.toFixed(1) }, tone: colorTone(lch.L * 100, lch.C, lch.h) };
+        if (o.hex) entry.hex = hexFromRGB(c.rgb);
+        return entry;
       });
 
     // Find worst contrast pairs
@@ -332,8 +415,8 @@
         const bgLch = rgbToOklch(p.bg.r, p.bg.g, p.bg.b);
         return {
           path: p.path,
-          fg: rgbString(p.fg), fgHex: hexFromRGB(p.fg), fgOklch: { L: +(fgLch.L * 100).toFixed(1), C: +fgLch.C.toFixed(3), h: +fgLch.h.toFixed(1) },
-          bg: rgbString(p.bg), bgHex: hexFromRGB(p.bg), bgOklch: { L: +(bgLch.L * 100).toFixed(1), C: +bgLch.C.toFixed(3), h: +bgLch.h.toFixed(1) },
+          fg: { L: +(fgLch.L * 100).toFixed(1), C: +fgLch.C.toFixed(3), h: +fgLch.h.toFixed(1) },
+          bg: { L: +(bgLch.L * 100).toFixed(1), C: +bgLch.C.toFixed(3), h: +bgLch.h.toFixed(1) },
           ratio: +p.ratio.toFixed(2),
         };
       });
@@ -345,38 +428,16 @@
       uniqueBgColors: Object.keys(bgColors).length,
       contrastDistribution: {
         min: +(ratios[0] || 0).toFixed(2),
-        p10: +percentile(ratios, 0.1).toFixed(2),
-        p25: +percentile(ratios, 0.25).toFixed(2),
         median: +percentile(ratios, 0.5).toFixed(2),
-        p75: +percentile(ratios, 0.75).toFixed(2),
-        p90: +percentile(ratios, 0.9).toFixed(2),
-        max: +(ratios[ratios.length - 1] || 0).toFixed(2),
         avg: +avg(ratios).toFixed(2),
         belowAA: ratios.filter(r => r < 4.5).length,
-        belowAAA: ratios.filter(r => r < 7).length,
         total: ratios.length,
-      },
-      fgLuminanceSpread: {
-        min: +(fgLums[0] || 0).toFixed(3),
-        max: +(fgLums[fgLums.length - 1] || 0).toFixed(3),
-        avg: +avg(fgLums).toFixed(3),
-        range: +((fgLums[fgLums.length - 1] || 0) - (fgLums[0] || 0)).toFixed(3),
-      },
-      bgLuminanceSpread: {
-        min: +(bgLums[0] || 0).toFixed(3),
-        max: +(bgLums[bgLums.length - 1] || 0).toFixed(3),
-        count: bgLums.length,
-      },
-      avgSaturation: {
-        fg: +avg(Object.values(fgColors).map(c => c.sat)).toFixed(3),
-        bg: +avg(Object.values(bgColors).map(c => c.sat)).toFixed(3),
       },
       topForegroundColors: topFg,
       topBackgroundColors: topBg,
       worstContrastPairs: worstPairs,
     };
   }
-
   // === Tool: Anomaly Scanner ===
 
   function scanAnomalies(opts) {
@@ -1119,7 +1180,7 @@
   // === Tool: Palette Profile — design-system-level color identity ===
 
   function paletteProfile(opts) {
-    const o = Object.assign({ scope: 'body', maxElements: 5000 }, opts);
+    const o = Object.assign({ scope: 'body', maxElements: 5000, hex: false, format: 'data' }, opts);
     const root = document.querySelector(o.scope) || document.body;
 
     // --- Phase 1: Extract all colors ---
@@ -1344,97 +1405,10 @@
     if (harmony === 'analogous') vibes.push('harmonious');
     if (vibes.length === 0) vibes.push('balanced');
 
-    // --- Phase 3: Format output ---
-    const lines = [];
-    lines.push('=== PALETTE PROFILE ===');
-    lines.push('');
-
-    // Design tokens (custom properties)
+    // --- Phase 3: Build result ---
     const tokenColors = colors.filter(c => c.sources.includes('custom-prop'));
-    if (tokenColors.length > 0) {
-      lines.push(`Design tokens: ${tokenColors.length} colors from CSS custom properties`);
-      tokenColors.slice(0, 20).forEach(c => {
-        const L = (c.lch.L * 100).toFixed(0);
-        const C = c.lch.C.toFixed(3);
-        const h = c.lch.h.toFixed(0);
-        lines.push(`  ${c.hex}  L:${L} C:${C} h:${h}°  [${chromaLabel(c.lch.C)}]`);
-      });
-      lines.push('');
-    }
 
-    // Top used colors
-    lines.push(`Palette: ${colors.length} unique colors (${scanned} elements scanned)`);
-    lines.push('');
-    lines.push('Top colors by usage:');
-    colors.slice(0, 15).forEach((c, i) => {
-      const L = (c.lch.L * 100).toFixed(0);
-      const C = c.lch.C.toFixed(3);
-      const h = c.lch.h.toFixed(0);
-      lines.push(`  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${chromaLabel(c.lch.C)}]  ×${c.count}  (${c.sources.join(', ')})`);
-    });
-    lines.push('');
-
-    // Hue groups
-    lines.push(`Hue clusters: ${hueGroups.length} group${hueGroups.length !== 1 ? 's' : ''}`);
-    hueGroups.forEach((g, i) => {
-      const repHue = groupHues[i].toFixed(0);
-      const samples = g.slice(0, 3).map(c => c.hex).join(', ');
-      lines.push(`  Group ${i + 1}: h ≈ ${repHue}°  (${g.length} colors: ${samples}${g.length > 3 ? '…' : ''})`);
-    });
-    lines.push(`Harmony: ${harmony}`);
-    if (groupHues.length === 2) {
-      lines.push(`  Hue gap: ${hueDistance(groupHues[0], groupHues[1]).toFixed(0)}°`);
-    }
-    lines.push('');
-
-    // Lightness
-    lines.push(`Lightness distribution: ${lightnessShape}`);
-    lines.push(`  Range: L ${(lMin * 100).toFixed(0)}–${(lMax * 100).toFixed(0)}, avg ${(lAvg * 100).toFixed(0)}`);
-    const binLabels = ['0-20', '20-40', '40-60', '60-80', '80-100'];
-    const hist = lBins.map((b, i) => `${binLabels[i]}:${b}`).join('  ');
-    lines.push(`  Histogram: ${hist}`);
-    lines.push('');
-
-    // Chroma
-    lines.push(`Chroma: avg ${cAvg.toFixed(3)} [${chromaLabel(cAvg)}], max ${cMax.toFixed(3)} [${chromaLabel(cMax)}]`);
-    lines.push(`  Pure neutrals: ${neutrals.length}, tinted neutrals: ${tintedNeutrals.length}, chromatic: ${chromatic.length - tintedNeutrals.length}`);
-    if (neutralTint) {
-      lines.push(`  Neutral tint: h ≈ ${neutralTint.hue}° across ${neutralTint.count} tinted neutrals`);
-    }
-    lines.push('');
-
-    // Contrast issues (top pairings)
-    const fgColors = colors.filter(c => c.sources.includes('fg')).slice(0, 5);
-    const bgColors = colors.filter(c => c.sources.includes('bg')).slice(0, 5);
-    if (fgColors.length > 0 && bgColors.length > 0) {
-      const worstPairs = [];
-      for (const fg of fgColors) {
-        for (const bg of bgColors) {
-          const fgLum = luminance(fg.rgb);
-          const bgLum = luminance(bg.rgb);
-          const ratio = contrast(fgLum, bgLum);
-          if (ratio < 4.5 && ratio > 1.1) {
-            worstPairs.push({ fg: fg.hex, bg: bg.hex, ratio });
-          }
-        }
-      }
-      worstPairs.sort((a, b) => a.ratio - b.ratio);
-      if (worstPairs.length > 0) {
-        lines.push('WCAG contrast concerns:');
-        worstPairs.slice(0, 5).forEach(p => {
-          const level = p.ratio < 3 ? 'FAIL AA' : 'FAIL AA-large-only';
-          lines.push(`  ${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1 — ${level}`);
-        });
-        lines.push('');
-      }
-    }
-
-    // Vibe
-    lines.push(`Vibe: ${vibes.join(', ')}`);
-
-    return {
-      text: lines.join('\n'),
-      data: {
+    const data = {
         totalColors: colors.length,
         scanned,
         tokenCount: tokenColors.length,
@@ -1445,12 +1419,98 @@
         chromaMax: +cMax.toFixed(3),
         neutralTint,
         vibes,
-        colors: colors.slice(0, 30).map(c => ({
-          hex: c.hex, L: +( c.lch.L * 100).toFixed(1), C: +c.lch.C.toFixed(3), h: +c.lch.h.toFixed(1),
-          label: chromaLabel(c.lch.C), count: c.count, sources: c.sources,
-        })),
-      },
+        colors: colors.slice(0, 30).map(c => {
+          const entry = {
+            L: +(c.lch.L * 100).toFixed(1), C: +c.lch.C.toFixed(3), h: +c.lch.h.toFixed(1),
+            tone: colorTone(c.lch.L, c.lch.C, c.lch.h), count: c.count, sources: c.sources,
+          };
+          if (o.hex) entry.hex = c.hex;
+          return entry;
+        }),
     };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push('=== PALETTE PROFILE ===');
+      lines.push('');
+
+      if (tokenColors.length > 0) {
+        lines.push(`Design tokens: ${tokenColors.length} colors from CSS custom properties`);
+        tokenColors.slice(0, 20).forEach(c => {
+          const L = (c.lch.L * 100).toFixed(0);
+          const C = c.lch.C.toFixed(3);
+          const h = c.lch.h.toFixed(0);
+          lines.push(`  ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]`);
+        });
+        lines.push('');
+      }
+
+      lines.push(`Palette: ${colors.length} unique colors (${scanned} elements scanned)`);
+      lines.push('');
+      lines.push('Top colors by usage:');
+      colors.slice(0, 15).forEach((c, i) => {
+        const L = (c.lch.L * 100).toFixed(0);
+        const C = c.lch.C.toFixed(3);
+        const h = c.lch.h.toFixed(0);
+        lines.push(`  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]  ×${c.count}  (${c.sources.join(', ')})`);
+      });
+      lines.push('');
+
+      lines.push(`Hue clusters: ${hueGroups.length} group${hueGroups.length !== 1 ? 's' : ''}`);
+      hueGroups.forEach((g, i) => {
+        const repHue = groupHues[i].toFixed(0);
+        const samples = g.slice(0, 3).map(c => c.hex).join(', ');
+        lines.push(`  Group ${i + 1}: h ≈ ${repHue}°  (${g.length} colors: ${samples}${g.length > 3 ? '…' : ''})`);
+      });
+      lines.push(`Harmony: ${harmony}`);
+      if (groupHues.length === 2) {
+        lines.push(`  Hue gap: ${hueDistance(groupHues[0], groupHues[1]).toFixed(0)}°`);
+      }
+      lines.push('');
+
+      lines.push(`Lightness distribution: ${lightnessShape}`);
+      lines.push(`  Range: L ${(lMin * 100).toFixed(0)}–${(lMax * 100).toFixed(0)}, avg ${(lAvg * 100).toFixed(0)}`);
+      const binLabels = ['0-20', '20-40', '40-60', '60-80', '80-100'];
+      const hist = lBins.map((b, i) => `${binLabels[i]}:${b}`).join('  ');
+      lines.push(`  Histogram: ${hist}`);
+      lines.push('');
+
+      lines.push(`Chroma: avg ${cAvg.toFixed(3)}, max ${cMax.toFixed(3)}`);
+      lines.push(`  Pure neutrals: ${neutrals.length}, tinted neutrals: ${tintedNeutrals.length}, chromatic: ${chromatic.length - tintedNeutrals.length}`);
+      if (neutralTint) {
+        lines.push(`  Neutral tint: h ≈ ${neutralTint.hue}° across ${neutralTint.count} tinted neutrals`);
+      }
+      lines.push('');
+
+      const fgColors = colors.filter(c => c.sources.includes('fg')).slice(0, 5);
+      const bgColors = colors.filter(c => c.sources.includes('bg')).slice(0, 5);
+      if (fgColors.length > 0 && bgColors.length > 0) {
+        const worstPairs = [];
+        for (const fg of fgColors) {
+          for (const bg of bgColors) {
+            const fgLum = luminance(fg.rgb);
+            const bgLum = luminance(bg.rgb);
+            const ratio = contrast(fgLum, bgLum);
+            if (ratio < 4.5 && ratio > 1.1) {
+              worstPairs.push({ fg: fg.hex, bg: bg.hex, ratio });
+            }
+          }
+        }
+        worstPairs.sort((a, b) => a.ratio - b.ratio);
+        if (worstPairs.length > 0) {
+          lines.push('WCAG contrast concerns:');
+          worstPairs.slice(0, 5).forEach(p => {
+            const level = p.ratio < 3 ? 'FAIL AA' : 'FAIL AA-large-only';
+            lines.push(`  ${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1 — ${level}`);
+          });
+          lines.push('');
+        }
+      }
+
+      lines.push(`Vibe: ${vibes.join(', ')}`);
+      return { text: lines.join('\n'), data };
+    }
+    return data;
   }
 
   // === Tool: Typography Profile ===
@@ -1550,73 +1610,76 @@
       .sort((a, b) => b[1] - a[1])
       .map(([family, count]) => ({ family, count }));
 
-    // Build text report
-    const lines = [];
-    lines.push(`Typography Profile — ${scanned} text elements scanned`);
-    lines.push('');
-
-    lines.push('Font families:');
-    families.forEach(f => {
-      lines.push(`  ${f.family}  (${f.count} elements)`);
-    });
-    lines.push('');
-
-    lines.push(`Type scale (${scale.length} distinct styles):`);
-    scale.forEach(s => {
-      lines.push(`  ${s.fontSize}px / ${s.fontWeight} / ${s.lineHeight} — ${s.count}× [${s.tags.join(', ')}] "${s.sample}"`);
-    });
-    lines.push('');
-
-    lines.push('Semantic groups:');
-    for (const [role, entries] of Object.entries(groups)) {
-      if (entries.length === 0) continue;
-      const sizes = entries.map(e => e.fontSize + 'px').join(', ');
-      lines.push(`  ${role}: ${entries.length} styles (${sizes})`);
-    }
-    lines.push('');
-
-    lines.push('Weight distribution:');
-    Object.entries(weights).sort((a, b) => +a[0] - +b[0]).forEach(([w, c]) => {
-      lines.push(`  ${w}: ${c} elements`);
-    });
-
-    if (Object.keys(letterSpacingMap).length > 0) {
-      lines.push('');
-      lines.push('Letter-spacing patterns:');
-      Object.entries(letterSpacingMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
-        lines.push(`  ${v}: ${c} elements`);
-      });
-    }
-
-    if (Object.keys(textTransformMap).length > 0) {
-      lines.push('');
-      lines.push('Text-transform usage:');
-      Object.entries(textTransformMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
-        lines.push(`  ${v}: ${c} elements`);
-      });
-    }
-
-    return {
-      text: lines.join('\n'),
-      data: {
-        scanned,
-        families,
-        scale: scale.map(s => ({
-          fontSize: s.fontSize,
-          fontWeight: s.fontWeight,
-          lineHeight: s.lineHeight,
-          letterSpacing: s.letterSpacing,
-          textTransform: s.textTransform,
-          count: s.count,
-          tags: s.tags,
-          sample: s.sample,
-        })),
-        groups,
-        weights,
-        letterSpacing: letterSpacingMap,
-        textTransform: textTransformMap,
-      },
+    const data = {
+      scanned,
+      families,
+      scale: scale.map(s => ({
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        lineHeight: s.lineHeight,
+        letterSpacing: s.letterSpacing,
+        textTransform: s.textTransform,
+        count: s.count,
+        tags: s.tags,
+        sample: s.sample,
+      })),
+      groups,
+      weights,
+      letterSpacing: letterSpacingMap,
+      textTransform: textTransformMap,
     };
+
+    if (o.format === 'text') {
+      // Build text report
+      const lines = [];
+      lines.push(`Typography Profile — ${scanned} text elements scanned`);
+      lines.push('');
+
+      lines.push('Font families:');
+      families.forEach(f => {
+        lines.push(`  ${f.family}  (${f.count} elements)`);
+      });
+      lines.push('');
+
+      lines.push(`Type scale (${scale.length} distinct styles):`);
+      scale.forEach(s => {
+        lines.push(`  ${s.fontSize}px / ${s.fontWeight} / ${s.lineHeight} — ${s.count}× [${s.tags.join(', ')}] "${s.sample}"`);
+      });
+      lines.push('');
+
+      lines.push('Semantic groups:');
+      for (const [role, entries] of Object.entries(groups)) {
+        if (entries.length === 0) continue;
+        const sizes = entries.map(e => e.fontSize + 'px').join(', ');
+        lines.push(`  ${role}: ${entries.length} styles (${sizes})`);
+      }
+      lines.push('');
+
+      lines.push('Weight distribution:');
+      Object.entries(weights).sort((a, b) => +a[0] - +b[0]).forEach(([w, c]) => {
+        lines.push(`  ${w}: ${c} elements`);
+      });
+
+      if (Object.keys(letterSpacingMap).length > 0) {
+        lines.push('');
+        lines.push('Letter-spacing patterns:');
+        Object.entries(letterSpacingMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
+          lines.push(`  ${v}: ${c} elements`);
+        });
+      }
+
+      if (Object.keys(textTransformMap).length > 0) {
+        lines.push('');
+        lines.push('Text-transform usage:');
+        Object.entries(textTransformMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
+          lines.push(`  ${v}: ${c} elements`);
+        });
+      }
+
+      return { text: lines.join('\n'), data };
+    }
+
+    return data;
   }
 
   // === Tool: Gradient Profile ===
@@ -1770,45 +1833,46 @@
       for (const s of g.stops) uniqueHexes.add(s.hex);
     }
 
-    // Build text report
-    const lines = [];
-    lines.push(`Gradient Profile — ${gradients.length} gradients found, ${deduped.length} unique (scanned ${scanned} elements)`);
-    lines.push('');
-    lines.push('By type:');
-    if (summary.linear) lines.push(`  linear-gradient: ${summary.linear}`);
-    if (summary.radial) lines.push(`  radial-gradient: ${summary.radial}`);
-    if (summary.conic) lines.push(`  conic-gradient: ${summary.conic}`);
-    lines.push('');
-    lines.push('By classification:');
-    for (const cls of ['atmosphere', 'overlay', 'functional', 'separator']) {
-      if (summary[cls]) lines.push(`  ${cls}: ${summary[cls]}`);
-    }
-    lines.push('');
-    lines.push(`Unique colors in gradient stops: ${uniqueHexes.size}`);
-    if (bgImageCount > 0) {
-      lines.push(`Background images (url()): ${bgImageCount}${bgImageSample ? ' — sample: ' + bgImageSample : ''}`);
-    }
-    lines.push('');
-    for (const g of deduped) {
-      const stopStr = g.stops.map(s => s.hex + (s.position ? ' ' + s.position : '')).join(' → ');
-      lines.push(`  ${g.type}${g.direction ? ' ' + g.direction : ''}: ${stopStr} [${g.classification}] ×${g.paths.length}`);
-      if (g.paths.length <= 3) {
-        for (const p of g.paths) lines.push(`    ${p}`);
-      } else {
-        lines.push(`    ${g.paths[0]} … +${g.paths.length - 1} more`);
+    const data = {
+      scanned,
+      gradients: deduped,
+      bgImageCount,
+      bgImageSamplePath: bgImageSample,
+      summary,
+    };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push(`Gradient Profile — ${gradients.length} gradients found, ${deduped.length} unique (scanned ${scanned} elements)`);
+      lines.push('');
+      lines.push('By type:');
+      if (summary.linear) lines.push(`  linear-gradient: ${summary.linear}`);
+      if (summary.radial) lines.push(`  radial-gradient: ${summary.radial}`);
+      if (summary.conic) lines.push(`  conic-gradient: ${summary.conic}`);
+      lines.push('');
+      lines.push('By classification:');
+      for (const cls of ['atmosphere', 'overlay', 'functional', 'separator']) {
+        if (summary[cls]) lines.push(`  ${cls}: ${summary[cls]}`);
       }
+      lines.push('');
+      lines.push(`Unique colors in gradient stops: ${uniqueHexes.size}`);
+      if (bgImageCount > 0) {
+        lines.push(`Background images (url()): ${bgImageCount}${bgImageSample ? ' — sample: ' + bgImageSample : ''}`);
+      }
+      lines.push('');
+      for (const g of deduped) {
+        const stopStr = g.stops.map(s => s.hex + (s.position ? ' ' + s.position : '')).join(' → ');
+        lines.push(`  ${g.type}${g.direction ? ' ' + g.direction : ''}: ${stopStr} [${g.classification}] ×${g.paths.length}`);
+        if (g.paths.length <= 3) {
+          for (const p of g.paths) lines.push(`    ${p}`);
+        } else {
+          lines.push(`    ${g.paths[0]} … +${g.paths.length - 1} more`);
+        }
+      }
+      return { text: lines.join('\n'), data };
     }
 
-    return {
-      text: lines.join('\n'),
-      data: {
-        scanned,
-        gradients: deduped,
-        bgImageCount,
-        bgImageSamplePath: bgImageSample,
-        summary,
-      },
-    };
+    return data;
   }
 
 
@@ -1919,7 +1983,26 @@
         }
       }
     }
-    const gridFlexGaps = [...gridFlexGapMap.values()];
+    const allGridFlexGaps = [...gridFlexGapMap.values()];
+    const totalGaps = allGridFlexGaps.length;
+    const gridFlexGaps = allGridFlexGaps.slice(0, 5);
+
+    const data = {
+      scanned,
+      baseUnit,
+      baseUnitCoverage,
+      scale,
+      byType: {
+        padding: Object.fromEntries(padding),
+        margin: Object.fromEntries(margin),
+        gap: Object.fromEntries(gapMap),
+      },
+      sectionRhythm,
+      gridFlexGaps,
+      totalGaps,
+    };
+
+    if (o.format !== 'text') return data;
 
     function fmtFreq(map, limit) {
       return [...map.entries()]
@@ -1959,8 +2042,8 @@
     }
 
     if (gridFlexGaps.length) {
-      lines.push('Grid/flex gaps:');
-      for (const g of gridFlexGaps.slice(0, 15)) {
+      lines.push('Grid/flex gaps (' + totalGaps + ' total):');
+      for (const g of gridFlexGaps) {
         const parts = [g.display];
         if (g.gap) parts.push('gap:' + g.gap + 'px');
         if (g.rowGap && g.rowGap !== g.gap) parts.push('row-gap:' + g.rowGap + 'px');
@@ -1976,19 +2059,7 @@
 
     return {
       text: lines.join('\n'),
-      data: {
-        scanned,
-        baseUnit,
-        baseUnitCoverage,
-        scale,
-        byType: {
-          padding: Object.fromEntries(padding),
-          margin: Object.fromEntries(margin),
-          gap: Object.fromEntries(gapMap),
-        },
-        sectionRhythm,
-        gridFlexGaps,
-      },
+      data,
     };
   }
 
@@ -2107,49 +2178,52 @@
     const uniqueValues = new Set(breakpoints.map(b => b.value)).size;
     const mostUsed = breakpoints.length ? breakpoints.reduce((a, b) => a.ruleCount >= b.ruleCount ? a : b) : null;
 
-    const lines = [];
-    lines.push('Responsive Profile \u2014 ' + sheetsTotal + ' stylesheets (' + sheetsAccessible + ' accessible, ' + sheetsBlocked + ' blocked by CORS)');
-    lines.push('');
-
-    if (breakpoints.length) {
-      lines.push('Breakpoints (' + uniqueValues + ' unique values):');
-      for (const bp of breakpoints) {
-        const props = bp.topProperties.length ? bp.topProperties.join(', ') : '';
-        lines.push('  ' + String(bp.value).padStart(5) + 'px  (' + bp.direction + '-' + bp.dimension + ') \u2014 ' + String(bp.ruleCount).padStart(3) + ' rules  [' + bp.tier + ']' + (props ? '   ' + props : ''));
-      }
-      lines.push('');
-
-      lines.push('Tier summary:');
-      for (const [name, tier] of Object.entries(tiers)) {
-        if (tier.breakpoints.length) {
-          lines.push('  ' + name + ':  ' + tier.breakpoints.length + ' breakpoint' + (tier.breakpoints.length > 1 ? 's' : '') + ', ' + tier.totalRules + ' rules');
-        }
-      }
-      lines.push('');
-
-      if (topProperties.length) {
-        lines.push('Most changed properties: ' + topProperties.map(([p, c]) => p + ' (' + c + ' breakpoints)').join(', '));
-      }
-    } else {
-      lines.push('No @media breakpoints found in accessible stylesheets.');
-    }
-
-    return {
-      text: lines.join('\n'),
-      data: {
-        sheetsTotal,
-        sheetsAccessible,
-        sheetsBlocked,
-        breakpoints,
-        tiers,
-        summary: {
-          totalBreakpoints: breakpoints.length,
-          uniqueValues,
-          mostUsedBreakpoint: mostUsed ? mostUsed.value : null,
-          topProperties: topProperties.map(([p, c]) => ({ property: p, breakpointCount: c })),
-        },
+    const data = {
+      sheetsTotal,
+      sheetsAccessible,
+      sheetsBlocked,
+      breakpoints,
+      tiers,
+      summary: {
+        totalBreakpoints: breakpoints.length,
+        uniqueValues,
+        mostUsedBreakpoint: mostUsed ? mostUsed.value : null,
+        topProperties: topProperties.map(([p, c]) => ({ property: p, breakpointCount: c })),
       },
     };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push('Responsive Profile \u2014 ' + sheetsTotal + ' stylesheets (' + sheetsAccessible + ' accessible, ' + sheetsBlocked + ' blocked by CORS)');
+      lines.push('');
+
+      if (breakpoints.length) {
+        lines.push('Breakpoints (' + uniqueValues + ' unique values):');
+        for (const bp of breakpoints) {
+          const props = bp.topProperties.length ? bp.topProperties.join(', ') : '';
+          lines.push('  ' + String(bp.value).padStart(5) + 'px  (' + bp.direction + '-' + bp.dimension + ') \u2014 ' + String(bp.ruleCount).padStart(3) + ' rules  [' + bp.tier + ']' + (props ? '   ' + props : ''));
+        }
+        lines.push('');
+
+        lines.push('Tier summary:');
+        for (const [name, tier] of Object.entries(tiers)) {
+          if (tier.breakpoints.length) {
+            lines.push('  ' + name + ':  ' + tier.breakpoints.length + ' breakpoint' + (tier.breakpoints.length > 1 ? 's' : '') + ', ' + tier.totalRules + ' rules');
+          }
+        }
+        lines.push('');
+
+        if (topProperties.length) {
+          lines.push('Most changed properties: ' + topProperties.map(([p, c]) => p + ' (' + c + ' breakpoints)').join(', '));
+        }
+      } else {
+        lines.push('No @media breakpoints found in accessible stylesheets.');
+      }
+
+      return { text: lines.join('\n'), data };
+    }
+
+    return data;
   }
 
 
@@ -2452,43 +2526,6 @@
       classifications[t.classification] = (classifications[t.classification] || 0) + 1;
     });
 
-    // Build text report
-    const lines = [];
-    lines.push('=== MOTION PROFILE ===');
-    lines.push('');
-    lines.push(`Scanned ${scanned} elements`);
-    lines.push(`Animations: ${animations.length} unique (${animations.reduce((s, a) => s + a.elementCount, 0)} elements)`);
-    lines.push(`Transitions: ${transitions.length} unique (${transitions.reduce((s, t) => s + t.elementCount, 0)} elements)`);
-    lines.push('');
-
-    if (animations.length > 0) {
-      lines.push('Animations:');
-      animations.forEach(a => {
-        lines.push(`  ${a.name} — ${a.duration} ${a.timing} [${a.classification}] ×${a.elementCount} (${a.path})`);
-      });
-      lines.push('');
-    }
-
-    if (transitions.length > 0) {
-      lines.push('Transitions:');
-      transitions.forEach(t => {
-        lines.push(`  ${t.properties.join(', ')} — ${t.duration.join(', ')} ${t.timing.join(', ')} [${t.classification}] ×${t.elementCount} (${t.path})`);
-      });
-      lines.push('');
-    }
-
-    if (validDurations.length > 0) {
-      lines.push(`Duration range: ${durationRange.min}ms – ${durationRange.max}ms (median ${durationRange.median}ms)`);
-    }
-
-    if (topEasings.length > 0) {
-      lines.push(`Top easings: ${topEasings.map(e => `${e.easing} (×${e.count})`).join(', ')}`);
-    }
-
-    if (Object.keys(classifications).length > 0) {
-      lines.push(`Classifications: ${Object.entries(classifications).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
-    }
-
     const summary = {
       totalAnimations: animations.length,
       totalTransitions: transitions.length,
@@ -2497,15 +2534,54 @@
       classifications,
     };
 
-    return {
-      text: lines.join('\n'),
-      data: {
-        scanned,
-        animations,
-        transitions,
-        summary,
-      },
+    const data = {
+      scanned,
+      animations,
+      transitions,
+      summary,
     };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push('=== MOTION PROFILE ===');
+      lines.push('');
+      lines.push(`Scanned ${scanned} elements`);
+      lines.push(`Animations: ${animations.length} unique (${animations.reduce((s, a) => s + a.elementCount, 0)} elements)`);
+      lines.push(`Transitions: ${transitions.length} unique (${transitions.reduce((s, t) => s + t.elementCount, 0)} elements)`);
+      lines.push('');
+
+      if (animations.length > 0) {
+        lines.push('Animations:');
+        animations.forEach(a => {
+          lines.push(`  ${a.name} — ${a.duration} ${a.timing} [${a.classification}] ×${a.elementCount} (${a.path})`);
+        });
+        lines.push('');
+      }
+
+      if (transitions.length > 0) {
+        lines.push('Transitions:');
+        transitions.forEach(t => {
+          lines.push(`  ${t.properties.join(', ')} — ${t.duration.join(', ')} ${t.timing.join(', ')} [${t.classification}] ×${t.elementCount} (${t.path})`);
+        });
+        lines.push('');
+      }
+
+      if (validDurations.length > 0) {
+        lines.push(`Duration range: ${durationRange.min}ms – ${durationRange.max}ms (median ${durationRange.median}ms)`);
+      }
+
+      if (topEasings.length > 0) {
+        lines.push(`Top easings: ${topEasings.map(e => `${e.easing} (×${e.count})`).join(', ')}`);
+      }
+
+      if (Object.keys(classifications).length > 0) {
+        lines.push(`Classifications: ${Object.entries(classifications).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
+      }
+
+      return { text: lines.join('\n'), data };
+    }
+
+    return data;
   }
 
   // === Tool: Page Map — topographic text layout of the page ===
@@ -3250,13 +3326,9 @@
         text: (el.textContent || '').trim().substring(0, 40) || null,
         widget,
         box: {
-          x: Math.round(rect.x), y: Math.round(rect.y),
           w: Math.round(rect.width), h: Math.round(rect.height),
-          // Viewport-percentage position for gesture planning
-          xPct: +(rect.x / vw * 100).toFixed(1),
-          yPct: +(rect.y / vh * 100).toFixed(1),
-          centerXPct: +((rect.x + rect.width / 2) / vw * 100).toFixed(1),
-          centerYPct: +((rect.y + rect.height / 2) / vh * 100).toFixed(1),
+          cx: +((rect.x + rect.width / 2) / vw * 100).toFixed(1),
+          cy: +((rect.y + rect.height / 2) / vh * 100).toFixed(1),
         },
         tooSmall,
         events: eventSummary,
@@ -3269,7 +3341,7 @@
       tooSmall: targets.filter(t => t.tooSmall).length,
       withWidgets: targets.filter(t => t.widget).length,
       mouseOnly: targets.filter(t => t.events?.mouseOnly).length,
-      targets,
+      targets: o.all ? targets : targets.filter(t => t.tooSmall),
     };
   }
 
@@ -3566,15 +3638,17 @@
 
   // === platformProfile: CMS, libraries, meta tags, analytics ===
 
-  function platformProfile() {
+  function platformProfile(opts) {
+    opts = opts || {};
+    const wantText = opts.format === 'text';
     const data = { cms: null, theme: null, generator: null, libraries: [], analytics: [], meta: {} };
-    const lines = [];
+    const lines = wantText ? [] : null;
 
     // Meta generator tag
     const gen = document.querySelector('meta[name="generator"]');
     if (gen) {
       data.generator = gen.content;
-      lines.push('Generator: ' + gen.content);
+      if (wantText) lines.push('Generator: ' + gen.content);
     }
 
     // Shopify detection
@@ -3583,7 +3657,7 @@
       if (window.Shopify.theme) {
         data.theme = { name: window.Shopify.theme.name, id: window.Shopify.theme.id, role: window.Shopify.theme.role };
       }
-      lines.push('CMS: Shopify' + (data.theme ? ' (' + data.theme.name + ', ' + data.theme.role + ')' : ''));
+      if (wantText) lines.push('CMS: Shopify' + (data.theme ? ' (' + data.theme.name + ', ' + data.theme.role + ')' : ''));
     }
 
     // WordPress detection
@@ -3593,22 +3667,22 @@
       data.cms = data.cms || 'WordPress';
       const wpGen = document.querySelector('meta[name="generator"][content*="WordPress"]');
       if (wpGen) data.generator = wpGen.content;
-      lines.push('CMS: WordPress' + (data.generator ? ' (' + data.generator + ')' : ''));
+      if (wantText) lines.push('CMS: WordPress' + (data.generator ? ' (' + data.generator + ')' : ''));
     }
 
     // Squarespace
     if (window.Static?.SQUARESPACE_CONTEXT || document.querySelector('meta[name="generator"][content*="Squarespace"]')) {
       data.cms = data.cms || 'Squarespace';
-      lines.push('CMS: Squarespace');
+      if (wantText) lines.push('CMS: Squarespace');
     }
 
     // Wix
     if (document.querySelector('meta[name="generator"][content*="Wix"]') || window.wixBiSession) {
       data.cms = data.cms || 'Wix';
-      lines.push('CMS: Wix');
+      if (wantText) lines.push('CMS: Wix');
     }
 
-    if (!data.cms) lines.push('CMS: not detected');
+    if (!data.cms && wantText) lines.push('CMS: not detected');
 
     // JS library detection
     const libs = [];
@@ -3626,7 +3700,7 @@
     if (window.bootstrap) libs.push('Bootstrap');
     if (window.tailwind || document.querySelector('link[href*="tailwind"], script[src*="tailwind"]')) libs.push('Tailwind CSS');
     data.libraries = libs;
-    if (libs.length) lines.push('Libraries: ' + libs.join(', '));
+    if (libs.length && wantText) lines.push('Libraries: ' + libs.join(', '));
 
     // Cookie consent / CMP
     const cmps = [];
@@ -3637,7 +3711,7 @@
     if (document.querySelector('[class*="cookie-banner"], [id*="cookie-banner"], [class*="consent"]')) cmps.push('cookie banner (DOM)');
     if (cmps.length) {
       data.cookieConsent = cmps;
-      lines.push('Cookie consent: ' + cmps.join(', '));
+      if (wantText) lines.push('Cookie consent: ' + cmps.join(', '));
     }
 
     // Analytics / tracking pixels by script src and known globals
@@ -3681,7 +3755,7 @@
     if (window.hj) analyticsMap.set('Hotjar', true);
 
     data.analytics = [...analyticsMap.keys()];
-    if (data.analytics.length) {
+    if (data.analytics.length && wantText) {
       lines.push('');
       lines.push('Integrations (' + data.analytics.length + '):');
       for (const a of data.analytics) lines.push('  ' + a);
@@ -3693,7 +3767,7 @@
       const el = document.querySelector('meta[name="' + name + '"], meta[property="' + name + '"]');
       if (el) data.meta[name] = el.content;
     }
-    if (Object.keys(data.meta).length) {
+    if (Object.keys(data.meta).length && wantText) {
       lines.push('');
       lines.push('Meta:');
       for (const [k, v] of Object.entries(data.meta)) {
@@ -3701,17 +3775,20 @@
       }
     }
 
-    return { text: lines.join('\n'), data };
+    if (wantText) return { text: lines.join('\n'), data };
+    return data;
   }
 
 
   // === siteProfile: composite design system tool ===
 
   function siteProfile(opts) {
-    const results = {};
-    const sections = [];
+    var o = Object.assign({ format: 'data' }, opts);
+    var results = {};
+    var wantText = o.format === 'text';
+    var sections = wantText ? [] : null;
 
-    const tools = [
+    var tools = [
       ['palette', paletteProfile],
       ['typography', typographyProfile],
       ['spacing', spacingProfile],
@@ -3721,25 +3798,28 @@
       ['platform', platformProfile],
     ];
 
-    for (const [name, fn] of tools) {
+    for (var i = 0; i < tools.length; i++) {
+      var name = tools[i][0], fn = tools[i][1];
       try {
-        const r = fn(opts);
+        var r = fn(wantText ? Object.assign({}, opts, { format: 'text' }) : opts);
         results[name] = r.data || r;
-        sections.push('=== ' + name.toUpperCase() + ' ===');
-        sections.push(r.text || JSON.stringify(r).substring(0, 500));
-        sections.push('');
+        if (wantText) {
+          sections.push('=== ' + name.toUpperCase() + ' ===');
+          sections.push(r.text || JSON.stringify(r).substring(0, 500));
+          sections.push('');
+        }
       } catch (e) {
         results[name] = { error: e.message };
-        sections.push('=== ' + name.toUpperCase() + ' ===');
-        sections.push('ERROR: ' + e.message);
-        sections.push('');
+        if (wantText) {
+          sections.push('=== ' + name.toUpperCase() + ' ===');
+          sections.push('ERROR: ' + e.message);
+          sections.push('');
+        }
       }
     }
 
-    return {
-      text: sections.join('\n'),
-      data: results,
-    };
+    if (wantText) return { text: sections.join('\n'), data: results };
+    return results;
   }
 
 
@@ -3780,6 +3860,6 @@
     gestureCapture,
     gestureResults,
     // Utility exports for ad-hoc use
-    _util: { parseRGB, hexFromRGB, luminance, contrast, saturation, effectiveBackground, elPath, detectDarkMode, boxModel, pctOfParent, interpolate, resolveEasing, EASING, rgbToOklab, oklabToOklch, rgbToOklch, oklchToRgb, deltaEOK, chromaLabel, hueDistance, harmonyClass },
+    _util: { parseRGB, hexFromRGB, luminance, contrast, saturation, effectiveBackground, elPath, detectDarkMode, boxModel, pctOfParent, interpolate, resolveEasing, EASING, rgbToOklab, oklabToOklch, rgbToOklch, oklchToRgb, deltaEOK, chromaLabel, hueName, colorTone, hueDistance, harmonyClass },
   };
 })();

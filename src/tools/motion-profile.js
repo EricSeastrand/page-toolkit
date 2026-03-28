@@ -170,43 +170,6 @@
       classifications[t.classification] = (classifications[t.classification] || 0) + 1;
     });
 
-    // Build text report
-    const lines = [];
-    lines.push('=== MOTION PROFILE ===');
-    lines.push('');
-    lines.push(`Scanned ${scanned} elements`);
-    lines.push(`Animations: ${animations.length} unique (${animations.reduce((s, a) => s + a.elementCount, 0)} elements)`);
-    lines.push(`Transitions: ${transitions.length} unique (${transitions.reduce((s, t) => s + t.elementCount, 0)} elements)`);
-    lines.push('');
-
-    if (animations.length > 0) {
-      lines.push('Animations:');
-      animations.forEach(a => {
-        lines.push(`  ${a.name} — ${a.duration} ${a.timing} [${a.classification}] ×${a.elementCount} (${a.path})`);
-      });
-      lines.push('');
-    }
-
-    if (transitions.length > 0) {
-      lines.push('Transitions:');
-      transitions.forEach(t => {
-        lines.push(`  ${t.properties.join(', ')} — ${t.duration.join(', ')} ${t.timing.join(', ')} [${t.classification}] ×${t.elementCount} (${t.path})`);
-      });
-      lines.push('');
-    }
-
-    if (validDurations.length > 0) {
-      lines.push(`Duration range: ${durationRange.min}ms – ${durationRange.max}ms (median ${durationRange.median}ms)`);
-    }
-
-    if (topEasings.length > 0) {
-      lines.push(`Top easings: ${topEasings.map(e => `${e.easing} (×${e.count})`).join(', ')}`);
-    }
-
-    if (Object.keys(classifications).length > 0) {
-      lines.push(`Classifications: ${Object.entries(classifications).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
-    }
-
     const summary = {
       totalAnimations: animations.length,
       totalTransitions: transitions.length,
@@ -215,14 +178,53 @@
       classifications,
     };
 
-    return {
-      text: lines.join('\n'),
-      data: {
-        scanned,
-        animations,
-        transitions,
-        summary,
-      },
+    const data = {
+      scanned,
+      animations,
+      transitions,
+      summary,
     };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push('=== MOTION PROFILE ===');
+      lines.push('');
+      lines.push(`Scanned ${scanned} elements`);
+      lines.push(`Animations: ${animations.length} unique (${animations.reduce((s, a) => s + a.elementCount, 0)} elements)`);
+      lines.push(`Transitions: ${transitions.length} unique (${transitions.reduce((s, t) => s + t.elementCount, 0)} elements)`);
+      lines.push('');
+
+      if (animations.length > 0) {
+        lines.push('Animations:');
+        animations.forEach(a => {
+          lines.push(`  ${a.name} — ${a.duration} ${a.timing} [${a.classification}] ×${a.elementCount} (${a.path})`);
+        });
+        lines.push('');
+      }
+
+      if (transitions.length > 0) {
+        lines.push('Transitions:');
+        transitions.forEach(t => {
+          lines.push(`  ${t.properties.join(', ')} — ${t.duration.join(', ')} ${t.timing.join(', ')} [${t.classification}] ×${t.elementCount} (${t.path})`);
+        });
+        lines.push('');
+      }
+
+      if (validDurations.length > 0) {
+        lines.push(`Duration range: ${durationRange.min}ms – ${durationRange.max}ms (median ${durationRange.median}ms)`);
+      }
+
+      if (topEasings.length > 0) {
+        lines.push(`Top easings: ${topEasings.map(e => `${e.easing} (×${e.count})`).join(', ')}`);
+      }
+
+      if (Object.keys(classifications).length > 0) {
+        lines.push(`Classifications: ${Object.entries(classifications).map(([k, v]) => `${k}: ${v}`).join(', ')}`);
+      }
+
+      return { text: lines.join('\n'), data };
+    }
+
+    return data;
   }
 

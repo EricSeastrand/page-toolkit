@@ -62,11 +62,72 @@
     return Math.sqrt(dL * dL + dC * dC + dh * dh);
   }
 
+  // @deprecated — use colorTone(L, C, h) instead. Will be removed in Batch 2.
   function chromaLabel(C) {
     if (C < 0.02) return 'neutral';
     if (C < 0.06) return 'tinted neutral';
     if (C < 0.15) return 'moderate';
     if (C < 0.25) return 'vivid';
     return 'intense';
+  }
+
+  function hueName(h) {
+    if (h >= 350 || h < 20)  return 'pink';
+    if (h < 45)  return 'red';
+    if (h < 70)  return 'orange';
+    if (h < 100) return 'yellow';
+    if (h < 130) return 'lime';
+    if (h < 160) return 'green';
+    if (h < 190) return 'teal';
+    if (h < 225) return 'cyan';
+    if (h < 260) return 'blue';
+    if (h < 290) return 'indigo';
+    return 'purple';
+  }
+
+  function colorTone(L, C, h) {
+    // Pure neutrals — no hue, describe by lightness only
+    if (C < 0.01) {
+      if (L >= 0.94) return 'white';
+      if (L >= 0.75) return 'light gray';
+      if (L >= 0.45) return 'gray';
+      if (L >= 0.25) return 'dark gray';
+      return 'black';
+    }
+
+    const hue = hueName(h);
+
+    // Tinted neutrals — noun is the neutral, hue is the adjective
+    if (C < 0.04) {
+      if (L >= 0.85) return hue + '-ish white';
+      if (L >= 0.35) return hue + '-ish gray';
+      return hue + '-ish black';
+    }
+
+    // Muted accents — noun is the hue, grayness is the adjective
+    if (C < 0.08) {
+      if (L >= 0.75) return 'pale ' + hue;
+      if (L >= 0.35) return 'grayish ' + hue;
+      return 'dark grayish ' + hue;
+    }
+
+    // Chromatic — ISCC-NBS modifiers selected by L and CIE saturation (C/L)
+    var s = L > 0.01 ? C / L : 0;
+
+    if (L >= 0.75) {
+      if (s >= 0.25) return 'vivid ' + hue;
+      if (s >= 0.12) return 'brilliant ' + hue;
+      return 'light ' + hue;
+    }
+    if (L >= 0.55) {
+      if (s >= 0.25) return 'strong ' + hue;
+      return 'moderate ' + hue;
+    }
+    if (L >= 0.35) {
+      if (s >= 0.25) return 'deep ' + hue;
+      return 'moderate ' + hue;
+    }
+    if (s >= 0.25) return 'deep ' + hue;
+    return 'dark ' + hue;
   }
 

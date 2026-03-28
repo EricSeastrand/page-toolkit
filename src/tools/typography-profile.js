@@ -95,72 +95,75 @@
       .sort((a, b) => b[1] - a[1])
       .map(([family, count]) => ({ family, count }));
 
-    // Build text report
-    const lines = [];
-    lines.push(`Typography Profile — ${scanned} text elements scanned`);
-    lines.push('');
-
-    lines.push('Font families:');
-    families.forEach(f => {
-      lines.push(`  ${f.family}  (${f.count} elements)`);
-    });
-    lines.push('');
-
-    lines.push(`Type scale (${scale.length} distinct styles):`);
-    scale.forEach(s => {
-      lines.push(`  ${s.fontSize}px / ${s.fontWeight} / ${s.lineHeight} — ${s.count}× [${s.tags.join(', ')}] "${s.sample}"`);
-    });
-    lines.push('');
-
-    lines.push('Semantic groups:');
-    for (const [role, entries] of Object.entries(groups)) {
-      if (entries.length === 0) continue;
-      const sizes = entries.map(e => e.fontSize + 'px').join(', ');
-      lines.push(`  ${role}: ${entries.length} styles (${sizes})`);
-    }
-    lines.push('');
-
-    lines.push('Weight distribution:');
-    Object.entries(weights).sort((a, b) => +a[0] - +b[0]).forEach(([w, c]) => {
-      lines.push(`  ${w}: ${c} elements`);
-    });
-
-    if (Object.keys(letterSpacingMap).length > 0) {
-      lines.push('');
-      lines.push('Letter-spacing patterns:');
-      Object.entries(letterSpacingMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
-        lines.push(`  ${v}: ${c} elements`);
-      });
-    }
-
-    if (Object.keys(textTransformMap).length > 0) {
-      lines.push('');
-      lines.push('Text-transform usage:');
-      Object.entries(textTransformMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
-        lines.push(`  ${v}: ${c} elements`);
-      });
-    }
-
-    return {
-      text: lines.join('\n'),
-      data: {
-        scanned,
-        families,
-        scale: scale.map(s => ({
-          fontSize: s.fontSize,
-          fontWeight: s.fontWeight,
-          lineHeight: s.lineHeight,
-          letterSpacing: s.letterSpacing,
-          textTransform: s.textTransform,
-          count: s.count,
-          tags: s.tags,
-          sample: s.sample,
-        })),
-        groups,
-        weights,
-        letterSpacing: letterSpacingMap,
-        textTransform: textTransformMap,
-      },
+    const data = {
+      scanned,
+      families,
+      scale: scale.map(s => ({
+        fontSize: s.fontSize,
+        fontWeight: s.fontWeight,
+        lineHeight: s.lineHeight,
+        letterSpacing: s.letterSpacing,
+        textTransform: s.textTransform,
+        count: s.count,
+        tags: s.tags,
+        sample: s.sample,
+      })),
+      groups,
+      weights,
+      letterSpacing: letterSpacingMap,
+      textTransform: textTransformMap,
     };
+
+    if (o.format === 'text') {
+      // Build text report
+      const lines = [];
+      lines.push(`Typography Profile — ${scanned} text elements scanned`);
+      lines.push('');
+
+      lines.push('Font families:');
+      families.forEach(f => {
+        lines.push(`  ${f.family}  (${f.count} elements)`);
+      });
+      lines.push('');
+
+      lines.push(`Type scale (${scale.length} distinct styles):`);
+      scale.forEach(s => {
+        lines.push(`  ${s.fontSize}px / ${s.fontWeight} / ${s.lineHeight} — ${s.count}× [${s.tags.join(', ')}] "${s.sample}"`);
+      });
+      lines.push('');
+
+      lines.push('Semantic groups:');
+      for (const [role, entries] of Object.entries(groups)) {
+        if (entries.length === 0) continue;
+        const sizes = entries.map(e => e.fontSize + 'px').join(', ');
+        lines.push(`  ${role}: ${entries.length} styles (${sizes})`);
+      }
+      lines.push('');
+
+      lines.push('Weight distribution:');
+      Object.entries(weights).sort((a, b) => +a[0] - +b[0]).forEach(([w, c]) => {
+        lines.push(`  ${w}: ${c} elements`);
+      });
+
+      if (Object.keys(letterSpacingMap).length > 0) {
+        lines.push('');
+        lines.push('Letter-spacing patterns:');
+        Object.entries(letterSpacingMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
+          lines.push(`  ${v}: ${c} elements`);
+        });
+      }
+
+      if (Object.keys(textTransformMap).length > 0) {
+        lines.push('');
+        lines.push('Text-transform usage:');
+        Object.entries(textTransformMap).sort((a, b) => b[1] - a[1]).forEach(([v, c]) => {
+          lines.push(`  ${v}: ${c} elements`);
+        });
+      }
+
+      return { text: lines.join('\n'), data };
+    }
+
+    return data;
   }
 

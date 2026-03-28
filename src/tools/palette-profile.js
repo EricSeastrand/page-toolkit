@@ -1,7 +1,7 @@
   // === Tool: Palette Profile — design-system-level color identity ===
 
   function paletteProfile(opts) {
-    const o = Object.assign({ scope: 'body', maxElements: 5000 }, opts);
+    const o = Object.assign({ scope: 'body', maxElements: 5000, hex: false, format: 'data' }, opts);
     const root = document.querySelector(o.scope) || document.body;
 
     // --- Phase 1: Extract all colors ---
@@ -226,97 +226,10 @@
     if (harmony === 'analogous') vibes.push('harmonious');
     if (vibes.length === 0) vibes.push('balanced');
 
-    // --- Phase 3: Format output ---
-    const lines = [];
-    lines.push('=== PALETTE PROFILE ===');
-    lines.push('');
-
-    // Design tokens (custom properties)
+    // --- Phase 3: Build result ---
     const tokenColors = colors.filter(c => c.sources.includes('custom-prop'));
-    if (tokenColors.length > 0) {
-      lines.push(`Design tokens: ${tokenColors.length} colors from CSS custom properties`);
-      tokenColors.slice(0, 20).forEach(c => {
-        const L = (c.lch.L * 100).toFixed(0);
-        const C = c.lch.C.toFixed(3);
-        const h = c.lch.h.toFixed(0);
-        lines.push(`  ${c.hex}  L:${L} C:${C} h:${h}°  [${chromaLabel(c.lch.C)}]`);
-      });
-      lines.push('');
-    }
 
-    // Top used colors
-    lines.push(`Palette: ${colors.length} unique colors (${scanned} elements scanned)`);
-    lines.push('');
-    lines.push('Top colors by usage:');
-    colors.slice(0, 15).forEach((c, i) => {
-      const L = (c.lch.L * 100).toFixed(0);
-      const C = c.lch.C.toFixed(3);
-      const h = c.lch.h.toFixed(0);
-      lines.push(`  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${chromaLabel(c.lch.C)}]  ×${c.count}  (${c.sources.join(', ')})`);
-    });
-    lines.push('');
-
-    // Hue groups
-    lines.push(`Hue clusters: ${hueGroups.length} group${hueGroups.length !== 1 ? 's' : ''}`);
-    hueGroups.forEach((g, i) => {
-      const repHue = groupHues[i].toFixed(0);
-      const samples = g.slice(0, 3).map(c => c.hex).join(', ');
-      lines.push(`  Group ${i + 1}: h ≈ ${repHue}°  (${g.length} colors: ${samples}${g.length > 3 ? '…' : ''})`);
-    });
-    lines.push(`Harmony: ${harmony}`);
-    if (groupHues.length === 2) {
-      lines.push(`  Hue gap: ${hueDistance(groupHues[0], groupHues[1]).toFixed(0)}°`);
-    }
-    lines.push('');
-
-    // Lightness
-    lines.push(`Lightness distribution: ${lightnessShape}`);
-    lines.push(`  Range: L ${(lMin * 100).toFixed(0)}–${(lMax * 100).toFixed(0)}, avg ${(lAvg * 100).toFixed(0)}`);
-    const binLabels = ['0-20', '20-40', '40-60', '60-80', '80-100'];
-    const hist = lBins.map((b, i) => `${binLabels[i]}:${b}`).join('  ');
-    lines.push(`  Histogram: ${hist}`);
-    lines.push('');
-
-    // Chroma
-    lines.push(`Chroma: avg ${cAvg.toFixed(3)} [${chromaLabel(cAvg)}], max ${cMax.toFixed(3)} [${chromaLabel(cMax)}]`);
-    lines.push(`  Pure neutrals: ${neutrals.length}, tinted neutrals: ${tintedNeutrals.length}, chromatic: ${chromatic.length - tintedNeutrals.length}`);
-    if (neutralTint) {
-      lines.push(`  Neutral tint: h ≈ ${neutralTint.hue}° across ${neutralTint.count} tinted neutrals`);
-    }
-    lines.push('');
-
-    // Contrast issues (top pairings)
-    const fgColors = colors.filter(c => c.sources.includes('fg')).slice(0, 5);
-    const bgColors = colors.filter(c => c.sources.includes('bg')).slice(0, 5);
-    if (fgColors.length > 0 && bgColors.length > 0) {
-      const worstPairs = [];
-      for (const fg of fgColors) {
-        for (const bg of bgColors) {
-          const fgLum = luminance(fg.rgb);
-          const bgLum = luminance(bg.rgb);
-          const ratio = contrast(fgLum, bgLum);
-          if (ratio < 4.5 && ratio > 1.1) {
-            worstPairs.push({ fg: fg.hex, bg: bg.hex, ratio });
-          }
-        }
-      }
-      worstPairs.sort((a, b) => a.ratio - b.ratio);
-      if (worstPairs.length > 0) {
-        lines.push('WCAG contrast concerns:');
-        worstPairs.slice(0, 5).forEach(p => {
-          const level = p.ratio < 3 ? 'FAIL AA' : 'FAIL AA-large-only';
-          lines.push(`  ${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1 — ${level}`);
-        });
-        lines.push('');
-      }
-    }
-
-    // Vibe
-    lines.push(`Vibe: ${vibes.join(', ')}`);
-
-    return {
-      text: lines.join('\n'),
-      data: {
+    const data = {
         totalColors: colors.length,
         scanned,
         tokenCount: tokenColors.length,
@@ -327,11 +240,97 @@
         chromaMax: +cMax.toFixed(3),
         neutralTint,
         vibes,
-        colors: colors.slice(0, 30).map(c => ({
-          hex: c.hex, L: +( c.lch.L * 100).toFixed(1), C: +c.lch.C.toFixed(3), h: +c.lch.h.toFixed(1),
-          label: chromaLabel(c.lch.C), count: c.count, sources: c.sources,
-        })),
-      },
+        colors: colors.slice(0, 30).map(c => {
+          const entry = {
+            L: +(c.lch.L * 100).toFixed(1), C: +c.lch.C.toFixed(3), h: +c.lch.h.toFixed(1),
+            tone: colorTone(c.lch.L, c.lch.C, c.lch.h), count: c.count, sources: c.sources,
+          };
+          if (o.hex) entry.hex = c.hex;
+          return entry;
+        }),
     };
+
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push('=== PALETTE PROFILE ===');
+      lines.push('');
+
+      if (tokenColors.length > 0) {
+        lines.push(`Design tokens: ${tokenColors.length} colors from CSS custom properties`);
+        tokenColors.slice(0, 20).forEach(c => {
+          const L = (c.lch.L * 100).toFixed(0);
+          const C = c.lch.C.toFixed(3);
+          const h = c.lch.h.toFixed(0);
+          lines.push(`  ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]`);
+        });
+        lines.push('');
+      }
+
+      lines.push(`Palette: ${colors.length} unique colors (${scanned} elements scanned)`);
+      lines.push('');
+      lines.push('Top colors by usage:');
+      colors.slice(0, 15).forEach((c, i) => {
+        const L = (c.lch.L * 100).toFixed(0);
+        const C = c.lch.C.toFixed(3);
+        const h = c.lch.h.toFixed(0);
+        lines.push(`  ${i + 1}. ${c.hex}  L:${L} C:${C} h:${h}°  [${colorTone(c.lch.L, c.lch.C, c.lch.h)}]  ×${c.count}  (${c.sources.join(', ')})`);
+      });
+      lines.push('');
+
+      lines.push(`Hue clusters: ${hueGroups.length} group${hueGroups.length !== 1 ? 's' : ''}`);
+      hueGroups.forEach((g, i) => {
+        const repHue = groupHues[i].toFixed(0);
+        const samples = g.slice(0, 3).map(c => c.hex).join(', ');
+        lines.push(`  Group ${i + 1}: h ≈ ${repHue}°  (${g.length} colors: ${samples}${g.length > 3 ? '…' : ''})`);
+      });
+      lines.push(`Harmony: ${harmony}`);
+      if (groupHues.length === 2) {
+        lines.push(`  Hue gap: ${hueDistance(groupHues[0], groupHues[1]).toFixed(0)}°`);
+      }
+      lines.push('');
+
+      lines.push(`Lightness distribution: ${lightnessShape}`);
+      lines.push(`  Range: L ${(lMin * 100).toFixed(0)}–${(lMax * 100).toFixed(0)}, avg ${(lAvg * 100).toFixed(0)}`);
+      const binLabels = ['0-20', '20-40', '40-60', '60-80', '80-100'];
+      const hist = lBins.map((b, i) => `${binLabels[i]}:${b}`).join('  ');
+      lines.push(`  Histogram: ${hist}`);
+      lines.push('');
+
+      lines.push(`Chroma: avg ${cAvg.toFixed(3)}, max ${cMax.toFixed(3)}`);
+      lines.push(`  Pure neutrals: ${neutrals.length}, tinted neutrals: ${tintedNeutrals.length}, chromatic: ${chromatic.length - tintedNeutrals.length}`);
+      if (neutralTint) {
+        lines.push(`  Neutral tint: h ≈ ${neutralTint.hue}° across ${neutralTint.count} tinted neutrals`);
+      }
+      lines.push('');
+
+      const fgColors = colors.filter(c => c.sources.includes('fg')).slice(0, 5);
+      const bgColors = colors.filter(c => c.sources.includes('bg')).slice(0, 5);
+      if (fgColors.length > 0 && bgColors.length > 0) {
+        const worstPairs = [];
+        for (const fg of fgColors) {
+          for (const bg of bgColors) {
+            const fgLum = luminance(fg.rgb);
+            const bgLum = luminance(bg.rgb);
+            const ratio = contrast(fgLum, bgLum);
+            if (ratio < 4.5 && ratio > 1.1) {
+              worstPairs.push({ fg: fg.hex, bg: bg.hex, ratio });
+            }
+          }
+        }
+        worstPairs.sort((a, b) => a.ratio - b.ratio);
+        if (worstPairs.length > 0) {
+          lines.push('WCAG contrast concerns:');
+          worstPairs.slice(0, 5).forEach(p => {
+            const level = p.ratio < 3 ? 'FAIL AA' : 'FAIL AA-large-only';
+            lines.push(`  ${p.fg} on ${p.bg}: ${p.ratio.toFixed(2)}:1 — ${level}`);
+          });
+          lines.push('');
+        }
+      }
+
+      lines.push(`Vibe: ${vibes.join(', ')}`);
+      return { text: lines.join('\n'), data };
+    }
+    return data;
   }
 

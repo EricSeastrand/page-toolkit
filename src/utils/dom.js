@@ -13,15 +13,35 @@
     const parts = [];
     let node = el;
     const depth = maxDepth || 4;
+    let foundId = false;
     while (node && node !== document.body && parts.length < depth) {
-      let id = node.tagName.toLowerCase();
-      if (node.id) id += `#${node.id}`;
-      else if (node.className && typeof node.className === 'string') {
+      let seg = node.tagName.toLowerCase();
+      if (node.id) {
+        seg = `#${node.id}`;
+        parts.unshift(seg);
+        foundId = true;
+        break;
+      } else if (node.className && typeof node.className === 'string') {
         const c = node.className.trim().split(/\s+/).slice(0, 2).join('.');
-        if (c) id += `.${c}`;
+        if (c) seg += `.${c}`;
       }
-      parts.unshift(id);
+      parts.unshift(seg);
       node = node.parentElement;
+    }
+    // If no id anchor found, walk further up looking for an ancestor with an id
+    if (!foundId && node && node !== document.body) {
+      while (node && node !== document.body) {
+        if (node.id) {
+          parts.unshift(`#${node.id}`);
+          foundId = true;
+          break;
+        }
+        node = node.parentElement;
+      }
+    }
+    // If still no id, trim to last 3 segments
+    if (!foundId && parts.length > 3) {
+      parts.splice(0, parts.length - 3);
     }
     return parts.join(' > ');
   }
