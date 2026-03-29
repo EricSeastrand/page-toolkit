@@ -19,9 +19,10 @@ Design system color identity: CSS custom properties, hue clusters, harmony, ligh
 ### `typographyProfile(opts?)`
 Font families, type scale, weights, semantic groups (display/heading/body/caption), hierarchy scoring, spatial context, crowding detection.
 - Returns: `{ text, data: { families[], scale[], scaleAnalysis, groups, crowding[], weights } }`
-- Each `scale[]` entry includes: `fontSize`, `fontWeight`, `lineHeight`, `lineHeightRatio` (computed), `leading` (px), `spatial: { avgBoxW, avgBoxH, avgPadY, avgMarginY, breathingRoom, avgCharsPerLine }`
-- `scaleAnalysis`: `{ distinctSizes[], ratios[], ratioAvg, ratioStdDev, range, hierarchyScore }` — hierarchyScore is 0–100 based on separation clarity, role coverage, weight differentiation, size range
-- `crowding[]`: flags for `tight-leading` (<1.15× lineHeight ratio), `no-margin` (<2px vertical margin on repeated elements), `wide-measure` (>80 chars/line)
+- Each `scale[]` entry includes: `fontSize`, `fontWeight`, `lineHeight`, `lineHeightRatio` (computed), `leading` (px), `vwRatio` (fontSize / viewportWidth), `spatial: { avgBoxW, avgBoxH, avgPadY, avgMarginY, breathingRoom, avgCharsPerLine, avgContainerW, containerRatio (fontSize / avgContainerW), avgGapToNext (px gap to next sibling; headings only, null otherwise) }`
+- `scaleAnalysis`: `{ distinctSizes[], ratios[], ratioAvg, ratioStdDev, range, hierarchyScore, weightDelta (avgHeadingWeight − avgBodyWeight), density ("sparse" ≤5 sizes / "moderate" 5–8 / "dense" >8), scaleType ("modular (Nx)" if σ<0.05 / "semi-modular" if σ≤0.15 / "custom" if >0.15) }` — hierarchyScore is 0–100 based on separation clarity, role coverage, weight differentiation, size range
+- `crowding[]`: flags for `tight-leading` (<1.15× lineHeight ratio), `no-margin` (<2px vertical margin on repeated elements), `wide-measure` (>80 chars/line), `cramped-in-container` (heading font >8% of container width), `lost-in-container` (body font <1% of container width), `viewport-oversized` (font >10% of viewport width), `tight-heading-gap` (heading gap to next element <0.5em)
+- `weights` scoring: gradient — weight diff ≥200 = 100pts, 100–199 = 75pts, 1–99 = 50pts, 0 = 25pts, negative = 0pts
 
 ### `gradientProfile(opts?)`
 Every CSS gradient deduplicated, classified (overlay/atmosphere/functional/separator).
@@ -104,8 +105,9 @@ Packing efficiency: fill ratios, gap inventories, text fill, headroom analysis.
 ## Platform Tools
 
 ### `platformProfile()`
-CMS detection, JS library fingerprinting, cookie consent, analytics inventory, meta tags.
-- Returns: `{ text, data: { cms, libraries[], analytics[], meta } }`
+CMS detection, JS library fingerprinting, cookie consent, analytics inventory, meta tags, modern CSS features.
+- Returns: `{ text, data: { cms, libraries[], analytics[], meta, cssFeatures } }`
+- `cssFeatures` — only includes features found: `{ has, layer, subgrid, containerQuery, colorMix, lightDark, logicalProps, fontDisplay: { swap: N, fallback: N, ... } }`
 
 ### `siteProfile(opts?)`
 Composite: runs paletteProfile + typographyProfile + spacingProfile + gradientProfile + motionProfile + responsiveProfile + platformProfile.

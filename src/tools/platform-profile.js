@@ -123,6 +123,57 @@
       for (const a of data.analytics) lines.push('  ' + a);
     }
 
+    // Modern CSS features census
+    const cssFeatures = { has: 0, layer: 0, subgrid: 0, containerQuery: 0, colorMix: 0, lightDark: 0, logicalProps: 0, fontDisplay: {} };
+    const logicalRe = /\b(margin-inline|margin-block|padding-inline|padding-block|inset-inline|inset-block|border-inline|border-block)\b/;
+    try {
+      for (const sheet of document.styleSheets) {
+        try {
+          const scanRules = (rules) => {
+            for (const rule of rules) {
+              const txt = rule.cssText || '';
+              if (txt.includes(':has(')) cssFeatures.has++;
+              if (rule.type === 7 || txt.startsWith('@layer')) cssFeatures.layer++;
+              if (txt.includes('subgrid')) cssFeatures.subgrid++;
+              if (txt.includes('container-type') || txt.startsWith('@container')) cssFeatures.containerQuery++;
+              if (txt.includes('color-mix(')) cssFeatures.colorMix++;
+              if (txt.includes('light-dark(')) cssFeatures.lightDark++;
+              if (logicalRe.test(txt)) cssFeatures.logicalProps++;
+              if (rule instanceof CSSFontFaceRule) {
+                const fd = rule.style.getPropertyValue('font-display');
+                if (fd) cssFeatures.fontDisplay[fd] = (cssFeatures.fontDisplay[fd] || 0) + 1;
+              }
+              if (rule.cssRules) scanRules(rule.cssRules);
+            }
+          };
+          scanRules(sheet.cssRules);
+        } catch (e) { /* cross-origin sheet */ }
+      }
+    } catch (e) {}
+    // Only include features that are actually present
+    const activeFeatures = {};
+    if (cssFeatures.has) activeFeatures.has = cssFeatures.has;
+    if (cssFeatures.layer) activeFeatures.layer = cssFeatures.layer;
+    if (cssFeatures.subgrid) activeFeatures.subgrid = cssFeatures.subgrid;
+    if (cssFeatures.containerQuery) activeFeatures.containerQuery = cssFeatures.containerQuery;
+    if (cssFeatures.colorMix) activeFeatures.colorMix = cssFeatures.colorMix;
+    if (cssFeatures.lightDark) activeFeatures.lightDark = cssFeatures.lightDark;
+    if (cssFeatures.logicalProps) activeFeatures.logicalProps = cssFeatures.logicalProps;
+    if (Object.keys(cssFeatures.fontDisplay).length) activeFeatures.fontDisplay = cssFeatures.fontDisplay;
+    data.cssFeatures = activeFeatures;
+    if (wantText && Object.keys(activeFeatures).length) {
+      lines.push('');
+      lines.push('CSS Features:');
+      const labels = { has: ':has()', layer: '@layer', subgrid: 'subgrid', containerQuery: '@container', colorMix: 'color-mix()', lightDark: 'light-dark()', logicalProps: 'logical properties' };
+      for (const [k, v] of Object.entries(activeFeatures)) {
+        if (k === 'fontDisplay') {
+          lines.push('  font-display: ' + Object.entries(v).map(([s, c]) => s + ' (' + c + ')').join(', '));
+        } else {
+          lines.push('  ' + (labels[k] || k) + ': ' + v + ' rules');
+        }
+      }
+    }
+
     // Useful meta tags
     const metaTags = ['viewport', 'description', 'theme-color', 'robots', 'og:type', 'og:title'];
     for (const name of metaTags) {
