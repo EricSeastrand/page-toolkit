@@ -17,8 +17,11 @@ Design system color identity: CSS custom properties, hue clusters, harmony, ligh
 - Returns: `{ text, data: { totalColors, harmony, lightnessShape, chromaAvg, vibes, colors[] } }`
 
 ### `typographyProfile(opts?)`
-Font families, type scale, weights, semantic groups (display/heading/body/caption).
-- Returns: `{ text, data: { families[], scale[], groups, weights } }`
+Font families, type scale, weights, semantic groups (display/heading/body/caption), hierarchy scoring, spatial context, crowding detection.
+- Returns: `{ text, data: { families[], scale[], scaleAnalysis, groups, crowding[], weights } }`
+- Each `scale[]` entry includes: `fontSize`, `fontWeight`, `lineHeight`, `lineHeightRatio` (computed), `leading` (px), `spatial: { avgBoxW, avgBoxH, avgPadY, avgMarginY, breathingRoom, avgCharsPerLine }`
+- `scaleAnalysis`: `{ distinctSizes[], ratios[], ratioAvg, ratioStdDev, range, hierarchyScore }` — hierarchyScore is 0–100 based on separation clarity, role coverage, weight differentiation, size range
+- `crowding[]`: flags for `tight-leading` (<1.15× lineHeight ratio), `no-margin` (<2px vertical margin on repeated elements), `wide-measure` (>80 chars/line)
 
 ### `gradientProfile(opts?)`
 Every CSS gradient deduplicated, classified (overlay/atmosphere/functional/separator).
