@@ -222,7 +222,6 @@
     if (lightnessShape === 'skewed-light' && cAvg < 0.1) vibes.push('minimal/clean');
     if (lightnessShape === 'skewed-light' && cAvg >= 0.1) vibes.push('airy/pastel');
     if (cMax >= 0.25) vibes.push('saturated');
-    if (neutralTint) vibes.push('tinted-neutral');
     if (harmony === 'complementary' || harmony === 'split-complementary') vibes.push('high-contrast-hue');
     if (harmony === 'analogous') vibes.push('harmonious');
     if (vibes.length === 0) vibes.push('balanced');

@@ -18,7 +18,8 @@ Design system color identity: CSS custom properties, hue clusters, harmony, ligh
 
 ### `typographyProfile(opts?)`
 Font families, type scale, weights, semantic groups (display/heading/body/caption), hierarchy scoring, spatial context, crowding detection.
-- Returns: `{ text, data: { families[], scale[], scaleAnalysis, groups, crowding[], weights } }`
+- Returns: `{ text, data: { families[], scale[], scaleAnalysis, groups, crowding[], weights, truncatedElements } }`
+- `truncatedElements` — count of elements with `text-overflow: ellipsis`. 0 on editorial/marketing sites, high on card-based layouts (e.g. Behance: 117).
 - Each `scale[]` entry includes: `fontSize`, `fontWeight`, `lineHeight`, `lineHeightRatio` (computed), `leading` (px), `vwRatio` (fontSize / viewportWidth), `spatial: { avgBoxW, avgBoxH, avgPadY, avgMarginY, breathingRoom, avgCharsPerLine, avgContainerW, containerRatio (fontSize / avgContainerW), avgGapToNext (px gap to next sibling; headings only, null otherwise) }`
 - `scaleAnalysis`: `{ distinctSizes[], ratios[], ratioAvg, ratioStdDev, range, hierarchyScore, weightDelta (avgHeadingWeight − avgBodyWeight), density ("sparse" ≤5 sizes / "moderate" 5–8 / "dense" >8), scaleType ("modular (Nx)" if σ<0.05 / "semi-modular" if σ≤0.15 / "custom" if >0.15) }` — hierarchyScore is 0–100 based on separation clarity, role coverage, weight differentiation, size range
 - `crowding[]`: flags for `tight-leading` (<1.15× lineHeight ratio), `no-margin` (<2px vertical margin on repeated elements), `wide-measure` (>80 chars/line), `cramped-in-container` (heading font >8% of container width), `lost-in-container` (body font <1% of container width), `viewport-oversized` (font >10% of viewport width), `tight-heading-gap` (heading gap to next element <0.5em)
@@ -106,9 +107,10 @@ Packing efficiency: fill ratios, gap inventories, text fill, headroom analysis.
 
 ### `platformProfile()`
 CMS detection, JS library fingerprinting, cookie consent, analytics inventory, meta tags, modern CSS features.
-- Returns: `{ text, data: { cms, libraries[], analytics[], meta, cssFeatures, imageStats?, zIndexStats? } }`
+- Returns: `{ text, data: { cms, libraries[], analytics[], meta, cssFeatures, domDepth, imageStats?, zIndexStats? } }`
 - `cssFeatures` — only includes features found: `{ has, layer, subgrid, containerQuery, colorMix, lightDark, logicalProps, fontDisplay: { swap: N, fallback: N, ... } }`
 - `imageStats` — present when page has images: `{ total, missingDimensions, pct, samples?[] }`. Flags `<img>` elements without `width`/`height` attributes or inline styles — a layout shift (CLS) risk.
+- `domDepth` — max DOM nesting depth from `<body>`. Range 10–36 across tested sites; higher values correlate with framework complexity.
 - `zIndexStats` — present when page uses non-zero z-index: `{ layers, max, values[], antiPattern? }`. Reports distinct z-index layer count, maximum value, and sorted values. `antiPattern: true` when max > 10000 — indicates z-index inflation, a CSS maintainability smell.
 
 ### `siteProfile(opts?)`

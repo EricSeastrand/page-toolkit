@@ -206,6 +206,19 @@
       }
     }
 
+    // DOM depth
+    let maxDepth = 0;
+    const walkDepth = (el, depth) => {
+      if (depth > maxDepth) maxDepth = depth;
+      for (let i = 0; i < el.children.length; i++) walkDepth(el.children[i], depth + 1);
+    };
+    walkDepth(document.body, 1);
+    data.domDepth = maxDepth;
+    if (wantText) {
+      lines.push('');
+      lines.push('DOM depth: ' + maxDepth + ' levels');
+    }
+
     // Z-index stacking complexity
     const zLayers = new Set();
     let zMax = 0;

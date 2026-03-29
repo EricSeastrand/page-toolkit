@@ -74,6 +74,30 @@
       if (!spatialBySize.has(sizeBucket)) {
         spatialBySize.set(sizeBucket, []);
       }
+      // Container width: nearest block-level ancestor
+      let containerW = 0;
+      let ancestor = par;
+      while (ancestor && ancestor !== document.body) {
+        const aDisp = window.getComputedStyle(ancestor).display;
+        if (aDisp === 'block' || aDisp === 'flex' || aDisp === 'grid') {
+          containerW = ancestor.getBoundingClientRect().width;
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      if (!containerW && par) containerW = par.getBoundingClientRect().width;
+
+      // Gap to next sibling for heading elements
+      let gapToNext = null;
+      const tagLower = el.tagName.toLowerCase();
+      if (/^h[1-6]$/.test(tagLower)) {
+        const nextEl = el.nextElementSibling;
+        if (nextEl) {
+          const nextRect = nextEl.getBoundingClientRect();
+          gapToNext = Math.max(0, +(nextRect.top - rect.bottom).toFixed(1));
+        }
+      }
+
       spatialBySize.get(sizeBucket).push({
         boxW: rect.width,
         boxH: rect.height,
@@ -81,6 +105,8 @@
         padX: pl + pr,
         marginY: mt + mb,
         parentPadY,
+        containerW,
+        gapToNext,
       });
 
       // Deduplicate by style signature
@@ -161,6 +187,14 @@
       const avgCharsPerLine = charW > 0 ? Math.round(textWidth / charW) : 0;
       // Breathing room: total vertical space (box) vs line-height
       const breathingRoom = lhPx > 0 ? +(avgBoxH / lhPx).toFixed(2) : 0;
+      // Container width ratio
+      const avgContainerW = +avgOf(spatials.map(d => d.containerW).filter(w => w > 0)).toFixed(1);
+      const containerRatio = avgContainerW > 0 ? +(s.fontSize / avgContainerW).toFixed(4) : 0;
+      // Viewport-relative sizing
+      const vwRatio = +(s.fontSize / window.innerWidth).toFixed(4);
+      // Gap to next (heading elements only — average non-null values)
+      const gapVals = spatials.map(d => d.gapToNext).filter(v => v !== null);
+      const avgGapToNext = gapVals.length ? +avgOf(gapVals).toFixed(1) : null;
 
       return {
         fontSize: s.fontSize,
@@ -179,7 +213,10 @@
           avgPadY, avgMarginY, avgParentPadY, effectiveSpaceY,
           breathingRoom,
           avgCharsPerLine,
+          avgContainerW, containerRatio,
+          avgGapToNext,
         },
+        vwRatio,
       };
     });
 
@@ -220,8 +257,11 @@
     const bodyWeights = [...groups.body, ...groups.caption].map(e => +e.fontWeight);
     const avgHeadingW = headingWeights.length ? avgOf(headingWeights) : 400;
     const avgBodyW = bodyWeights.length ? avgOf(bodyWeights) : 400;
-    const weightScore = avgHeadingW > avgBodyW ? 100
-      : avgHeadingW === avgBodyW ? 50 : 25;
+    const weightDelta = avgHeadingW - avgBodyW;
+    const weightScore = weightDelta >= 200 ? 100
+      : weightDelta >= 100 ? 75
+      : weightDelta > 0 ? 50
+      : weightDelta === 0 ? 25 : 0;
 
     // Size range (20%): 3×–6× = ideal
     const rangeScore = sizeRange >= 3 && sizeRange <= 6 ? 100
@@ -267,7 +307,52 @@
         });
         crowdSeen.add(fs + '|wide-measure');
       }
+      // Cramped heading: font > 8% of container width
+      if (entry.spatial.containerRatio > 0.08 && fs >= 24
+          && !crowdSeen.has(fs + '|cramped-in-container')) {
+        crowding.push({
+          fontSize: fs, issue: 'cramped-in-container',
+          containerRatio: entry.spatial.containerRatio, threshold: 0.08,
+          avgContainerW: entry.spatial.avgContainerW,
+        });
+        crowdSeen.add(fs + '|cramped-in-container');
+      }
+      // Lost body text: font < 1% of container width
+      if (entry.spatial.containerRatio > 0 && entry.spatial.containerRatio < 0.01 && fs <= 20
+          && !crowdSeen.has(fs + '|lost-in-container')) {
+        crowding.push({
+          fontSize: fs, issue: 'lost-in-container',
+          containerRatio: entry.spatial.containerRatio, threshold: 0.01,
+          avgContainerW: entry.spatial.avgContainerW,
+        });
+        crowdSeen.add(fs + '|lost-in-container');
+      }
+      // Viewport-oversized: text > 10% of viewport width
+      if (entry.vwRatio > 0.1 && !crowdSeen.has(fs + '|viewport-oversized')) {
+        crowding.push({
+          fontSize: fs, issue: 'viewport-oversized',
+          vwRatio: entry.vwRatio, threshold: 0.1,
+        });
+        crowdSeen.add(fs + '|viewport-oversized');
+      }
+      // Heading gap too small: heading with <0.5em gap to next element
+      if (entry.spatial.avgGapToNext !== null && entry.spatial.avgGapToNext < fs * 0.5
+          && fs >= 18 && !crowdSeen.has(fs + '|tight-heading-gap')) {
+        crowding.push({
+          fontSize: fs, issue: 'tight-heading-gap',
+          avgGapToNext: entry.spatial.avgGapToNext, threshold: +(fs * 0.5).toFixed(1),
+        });
+        crowdSeen.add(fs + '|tight-heading-gap');
+      }
     }
+
+    // Density classification
+    const density = distinctSizes.length <= 5 ? 'sparse'
+      : distinctSizes.length <= 8 ? 'moderate' : 'dense';
+
+    // Modular scale detection
+    const scaleType = ratioStdDev < 0.05 ? 'modular'
+      : ratioStdDev <= 0.15 ? 'semi-modular' : 'custom';
 
     const scaleAnalysis = {
       distinctSizes,
@@ -276,6 +361,9 @@
       ratioStdDev,
       range: sizeRange,
       hierarchyScore,
+      weightDelta: +weightDelta.toFixed(0),
+      density,
+      scaleType: scaleType + (scaleType === 'modular' && ratioAvg ? ` (${ratioAvg}×)` : ''),
     };
 
     // Deduplicate families
@@ -283,8 +371,17 @@
       .sort((a, b) => b[1] - a[1])
       .map(([family, count]) => ({ family, count }));
 
+    // Text truncation count
+    let truncatedElements = 0;
+    const truncCandidates = root.querySelectorAll('*');
+    for (let i = 0; i < truncCandidates.length; i++) {
+      const cs2 = window.getComputedStyle(truncCandidates[i]);
+      if (cs2.textOverflow === 'ellipsis') truncatedElements++;
+    }
+
     const data = {
       scanned,
+      truncatedElements,
       families,
       scale: enrichedScale.map(s => ({
         fontSize: s.fontSize,
@@ -297,6 +394,7 @@
         count: s.count,
         tags: s.tags,
         sample: s.sample,
+        vwRatio: s.vwRatio,
         spatial: s.spatial,
       })),
       scaleAnalysis,
@@ -310,7 +408,7 @@
     if (o.format === 'text') {
       // Build text report
       const lines = [];
-      lines.push(`Typography Profile — ${scanned} text elements scanned`);
+      lines.push(`Typography Profile — ${scanned} text elements scanned` + (truncatedElements ? `, ${truncatedElements} truncated` : ''));
       lines.push('');
 
       lines.push('Font families:');
@@ -322,14 +420,19 @@
       lines.push(`Type scale (${enrichedScale.length} distinct styles):`);
       enrichedScale.forEach(s => {
         lines.push(`  ${s.fontSize}px / ${s.fontWeight} / lh:${s.lineHeightRatio}× (${s.leading}px leading) — ${s.count}× [${s.tags.join(', ')}] "${s.sample}"`);
-        lines.push(`    spatial: ${s.spatial.avgBoxW}×${s.spatial.avgBoxH}px box, spaceY:${s.spatial.effectiveSpaceY}px (${s.spatial.avgMarginY}m+${s.spatial.avgPadY}p+${s.spatial.avgParentPadY}pp), ~${s.spatial.avgCharsPerLine} chars/line, ${s.spatial.breathingRoom}× breathing room`);
+        let spatialLine = `    spatial: ${s.spatial.avgBoxW}×${s.spatial.avgBoxH}px box, spaceY:${s.spatial.effectiveSpaceY}px (${s.spatial.avgMarginY}m+${s.spatial.avgPadY}p+${s.spatial.avgParentPadY}pp), ~${s.spatial.avgCharsPerLine} chars/line, ${s.spatial.breathingRoom}× breathing room`;
+        if (s.spatial.avgContainerW) spatialLine += `, container:${s.spatial.avgContainerW}px (${(s.spatial.containerRatio * 100).toFixed(1)}%)`;
+        if (s.spatial.avgGapToNext !== null) spatialLine += `, gapToNext:${s.spatial.avgGapToNext}px`;
+        spatialLine += `, vw:${(s.vwRatio * 100).toFixed(1)}%`;
+        lines.push(spatialLine);
       });
       lines.push('');
 
-      lines.push(`Scale analysis: ${distinctSizes.length} sizes, range ${sizeRange}×, hierarchy ${hierarchyScore}/100`);
+      lines.push(`Scale analysis: ${distinctSizes.length} sizes, range ${sizeRange}×, hierarchy ${hierarchyScore}/100, ${density} density, ${scaleAnalysis.scaleType} scale`);
       if (scaleRatios.length) {
         lines.push(`  Ratios: ${scaleRatios.join(', ')} (avg ${ratioAvg}, σ${ratioStdDev})`);
       }
+      lines.push(`  Weight contrast: ${weightDelta >= 0 ? '+' : ''}${weightDelta.toFixed(0)} (heading avg ${avgHeadingW.toFixed(0)} vs body avg ${avgBodyW.toFixed(0)})`);
       lines.push('');
 
       lines.push('Semantic groups:');
@@ -368,6 +471,10 @@
           if (c.issue === 'tight-leading') lines.push(`  ⚠ ${c.fontSize}px: tight leading (${c.lineHeightRatio}× < ${c.threshold}×)`);
           if (c.issue === 'no-spacing') lines.push(`  ⚠ ${c.fontSize}px: no vertical spacing (${c.effectiveSpaceY}px effective)`);
           if (c.issue === 'wide-measure') lines.push(`  ⚠ ${c.fontSize}px: wide measure (~${c.avgCharsPerLine} chars/line, max ${c.threshold})`);
+          if (c.issue === 'cramped-in-container') lines.push(`  ⚠ ${c.fontSize}px: cramped in container (${(c.containerRatio * 100).toFixed(1)}% of ${c.avgContainerW}px)`);
+          if (c.issue === 'lost-in-container') lines.push(`  ⚠ ${c.fontSize}px: lost in container (${(c.containerRatio * 100).toFixed(1)}% of ${c.avgContainerW}px)`);
+          if (c.issue === 'viewport-oversized') lines.push(`  ⚠ ${c.fontSize}px: oversized for viewport (${(c.vwRatio * 100).toFixed(1)}vw > 10vw)`);
+          if (c.issue === 'tight-heading-gap') lines.push(`  ⚠ ${c.fontSize}px: tight heading gap (${c.avgGapToNext}px < ${c.threshold}px)`);
         });
       }
 

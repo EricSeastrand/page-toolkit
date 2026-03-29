@@ -1397,7 +1397,6 @@
     if (lightnessShape === 'skewed-light' && cAvg < 0.1) vibes.push('minimal/clean');
     if (lightnessShape === 'skewed-light' && cAvg >= 0.1) vibes.push('airy/pastel');
     if (cMax >= 0.25) vibes.push('saturated');
-    if (neutralTint) vibes.push('tinted-neutral');
     if (harmony === 'complementary' || harmony === 'split-complementary') vibes.push('high-contrast-hue');
     if (harmony === 'analogous') vibes.push('harmonious');
     if (vibes.length === 0) vibes.push('balanced');
@@ -1887,8 +1886,17 @@
       .sort((a, b) => b[1] - a[1])
       .map(([family, count]) => ({ family, count }));
 
+    // Text truncation count
+    let truncatedElements = 0;
+    const truncCandidates = root.querySelectorAll('*');
+    for (let i = 0; i < truncCandidates.length; i++) {
+      const cs2 = window.getComputedStyle(truncCandidates[i]);
+      if (cs2.textOverflow === 'ellipsis') truncatedElements++;
+    }
+
     const data = {
       scanned,
+      truncatedElements,
       families,
       scale: enrichedScale.map(s => ({
         fontSize: s.fontSize,
@@ -1915,7 +1923,7 @@
     if (o.format === 'text') {
       // Build text report
       const lines = [];
-      lines.push(`Typography Profile — ${scanned} text elements scanned`);
+      lines.push(`Typography Profile — ${scanned} text elements scanned` + (truncatedElements ? `, ${truncatedElements} truncated` : ''));
       lines.push('');
 
       lines.push('Font families:');
@@ -4177,6 +4185,19 @@
           for (const s of clsSamples) lines.push('  ' + s);
         }
       }
+    }
+
+    // DOM depth
+    let maxDepth = 0;
+    const walkDepth = (el, depth) => {
+      if (depth > maxDepth) maxDepth = depth;
+      for (let i = 0; i < el.children.length; i++) walkDepth(el.children[i], depth + 1);
+    };
+    walkDepth(document.body, 1);
+    data.domDepth = maxDepth;
+    if (wantText) {
+      lines.push('');
+      lines.push('DOM depth: ' + maxDepth + ' levels');
     }
 
     // Z-index stacking complexity
