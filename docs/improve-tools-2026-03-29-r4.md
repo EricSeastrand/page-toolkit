@@ -29,10 +29,14 @@ Three backlog items from r3, implemented and validated together.
 - **Evidence**: Confirmed across r1 (5/6), r2 (5/6), r3 (5/6). The only sites without it had extremely desaturated palettes.
 - **Validation**: All three test sites produce vibes arrays without tinted-neutral. The neutralTint detection logic and text output for "Neutral tint: h ≈ N°" remain intact — only the vibe label was removed.
 
+### 4. Suppress lightnessShape "bimodal" noise
+- **Where**: `src/tools/palette-profile.js`
+- **What**: Bimodal (dark text on light bg) is the web default — fired ~14/18 sites across all runs. Now suppressed: `lightnessShape` returns `null` in data and omits the text line when bimodal. Deviations (uniform, skewed-dark, skewed-light) still surface. Internal variable preserved for filmic/dramatic vibe check.
+- **Validation**: Stripe shows "Lightness distribution: uniform" (genuine deviation). NYTimes and Behance suppress the bimodal line — correct.
+
 ## Remaining proposals (carried from r3)
 
 ### Noise
-- **`lightnessShape` "bimodal"** (3rd confirmation): ~14/18 overall. Dark-text-on-light-bg is the web default. Only deviations carry signal.
 - **`vibes` "filmic/dramatic"**: fires broadly, may need threshold recalibration.
 
 ### Gaps

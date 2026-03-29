@@ -1411,7 +1411,7 @@
         blockedSheets,
         hueGroups: hueGroups.length,
         harmony,
-        lightnessShape,
+        lightnessShape: lightnessShape === 'bimodal' ? null : lightnessShape,
         chromaAvg: +cAvg.toFixed(3),
         chromaMax: +cMax.toFixed(3),
         neutralTint,
@@ -1468,7 +1468,7 @@
       }
       lines.push('');
 
-      lines.push(`Lightness distribution: ${lightnessShape}`);
+      if (lightnessShape !== 'bimodal') lines.push(`Lightness distribution: ${lightnessShape}`);
       lines.push(`  Range: L ${(lMin * 100).toFixed(0)}–${(lMax * 100).toFixed(0)}, avg ${(lAvg * 100).toFixed(0)}`);
       const binLabels = ['0-20', '20-40', '40-60', '60-80', '80-100'];
       const hist = lBins.map((b, i) => `${binLabels[i]}:${b}`).join('  ');
