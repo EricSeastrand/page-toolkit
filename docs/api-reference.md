@@ -106,8 +106,9 @@ Packing efficiency: fill ratios, gap inventories, text fill, headroom analysis.
 
 ### `platformProfile()`
 CMS detection, JS library fingerprinting, cookie consent, analytics inventory, meta tags, modern CSS features.
-- Returns: `{ text, data: { cms, libraries[], analytics[], meta, cssFeatures } }`
+- Returns: `{ text, data: { cms, libraries[], analytics[], meta, cssFeatures, imageStats? } }`
 - `cssFeatures` — only includes features found: `{ has, layer, subgrid, containerQuery, colorMix, lightDark, logicalProps, fontDisplay: { swap: N, fallback: N, ... } }`
+- `imageStats` — present when page has images: `{ total, missingDimensions, pct, samples?[] }`. Flags `<img>` elements without `width`/`height` attributes or inline styles — a layout shift (CLS) risk.
 
 ### `siteProfile(opts?)`
 Composite: runs paletteProfile + typographyProfile + spacingProfile + gradientProfile + motionProfile + responsiveProfile + platformProfile.

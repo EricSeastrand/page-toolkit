@@ -174,6 +174,38 @@
       }
     }
 
+    // Image dimension audit (CLS risk)
+    const allImgs = document.querySelectorAll('img');
+    let imgsMissingDims = 0;
+    const clsSamples = [];
+    for (const img of allImgs) {
+      const hasW = img.getAttribute('width') || img.style.width;
+      const hasH = img.getAttribute('height') || img.style.height;
+      if (!hasW || !hasH) {
+        imgsMissingDims++;
+        if (clsSamples.length < 5) {
+          const src = img.getAttribute('src') || img.getAttribute('data-src') || '';
+          clsSamples.push(elPath(img) + (src ? ' (' + src.substring(0, 60) + ')' : ''));
+        }
+      }
+    }
+    if (allImgs.length > 0) {
+      const pct = Math.round(imgsMissingDims / allImgs.length * 100);
+      data.imageStats = {
+        total: allImgs.length,
+        missingDimensions: imgsMissingDims,
+        pct,
+        samples: clsSamples.length ? clsSamples : undefined,
+      };
+      if (wantText) {
+        lines.push('');
+        lines.push('Images: ' + allImgs.length + ' total, ' + imgsMissingDims + ' missing dimensions (' + pct + '% CLS risk)');
+        if (clsSamples.length) {
+          for (const s of clsSamples) lines.push('  ' + s);
+        }
+      }
+    }
+
     // Useful meta tags
     const metaTags = ['viewport', 'description', 'theme-color', 'robots', 'og:type', 'og:title'];
     for (const name of metaTags) {
