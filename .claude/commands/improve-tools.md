@@ -23,7 +23,7 @@ Pick **5-6 sites** from different categories each run. Aim for diversity — the
 
 Don't repeat the same sites across recent runs. Check `docs/` for prior field test files to avoid overlap.
 
-**Bot protection**: etsy.com, bookshop.org, medium.com, amazon.com, and reddit.com are currently blocked by bot detection in headless browsers (Cloudflare challenges or skeleton pages with <50 elements). Swap them out rather than burning time on retries.
+**Bot protection**: etsy.com, bookshop.org, medium.com, amazon.com, reddit.com, bloomberg.com, and wayfair.com are currently blocked by bot detection in headless browsers (Cloudflare challenges, PerimeterX, or skeleton pages with <50 elements). Swap them out rather than burning time on retries.
 
 ## Session Bootstrap
 
@@ -81,7 +81,7 @@ Also run **ad-hoc JavaScript measurements** for things the toolkit doesn't yet c
 // Heading prominence delta: size/weight/color distance between heading levels
 // Dominant focal point: what's the single largest/boldest/most-saturated element above the fold?
 // Competing focal points: how many elements above the fold fight for attention?
-// Line length distribution: what % of text blocks fall in the 45-75ch readable range?
+// Line length distribution: what % of text blocks fall in the 45-75ch readable range? [NOW IN typographyProfile.readability]
 // Scan structure: do headings/labels form a readable outline when body text is ignored?
 ```
 
