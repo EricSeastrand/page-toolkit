@@ -17,9 +17,10 @@ Design system color identity: CSS custom properties, hue clusters, harmony, ligh
 - Returns: `{ text, data: { totalColors, harmony, lightnessShape, chromaAvg, vibes, colors[] } }`
 
 ### `typographyProfile(opts?)`
-Font families, type scale, weights, semantic groups (display/heading/body/caption), hierarchy scoring, spatial context, crowding detection.
-- Returns: `{ text, data: { families[], scale[], scaleAnalysis, groups, crowding[], weights, truncatedElements } }`
+Font families, type scale, weights, semantic groups (display/heading/body/caption), hierarchy scoring, spatial context, crowding detection, line length readability.
+- Returns: `{ text, data: { families[], scale[], scaleAnalysis, groups, crowding[], weights, truncatedElements, readability? } }`
 - `truncatedElements` — count of elements with `text-overflow: ellipsis`. 0 on editorial/marketing sites, high on card-based layouts (e.g. Behance: 117).
+- `readability` — line length analysis for body text (12-24px, 80+ chars). Present when ≥2 qualifying blocks found. `{ blocks, comfortable, comfortablePct, tooWide, tooNarrow, avgCharsPerLine }`. Comfortable = 45-75 chars/line. Content-focused sites (w3.org: 42%) score higher than marketing sites (awwwards: 0%). Uses canvas `measureText` for accurate character width.
 - Each `scale[]` entry includes: `fontSize`, `fontWeight`, `lineHeight`, `lineHeightRatio` (computed), `leading` (px), `vwRatio` (fontSize / viewportWidth), `spatial: { avgBoxW, avgBoxH, avgPadY, avgMarginY, breathingRoom, avgCharsPerLine, avgContainerW, containerRatio (fontSize / avgContainerW), avgGapToNext (px gap to next sibling; headings only, null otherwise) }`
 - `scaleAnalysis`: `{ distinctSizes[], ratios[], ratioAvg, ratioStdDev, range, hierarchyScore, weightDelta (avgHeadingWeight − avgBodyWeight), density ("sparse" ≤5 sizes / "moderate" 5–8 / "dense" >8), scaleType ("modular (Nx)" if σ<0.05 / "semi-modular" if σ≤0.15 / "custom" if >0.15) }` — hierarchyScore is 0–100 based on separation clarity, role coverage, weight differentiation, size range
 - `crowding[]`: flags for `tight-leading` (<1.15× lineHeight ratio), `no-margin` (<2px vertical margin on repeated elements), `wide-measure` (>80 chars/line), `cramped-in-container` (heading font >8% of container width), `lost-in-container` (body font <1% of container width), `viewport-oversized` (font >10% of viewport width), `tight-heading-gap` (heading gap to next element <0.5em)

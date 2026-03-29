@@ -1894,9 +1894,58 @@
       if (cs2.textOverflow === 'ellipsis') truncatedElements++;
     }
 
+    // --- Line length / readability analysis ---
+    // Scan leaf text elements in reading range (12-24px) with substantial content
+    const readabilityBlocks = [];
+    const readCandidates = root.querySelectorAll('p, li, blockquote, td, th, figcaption, span, a, label');
+    for (let i = 0; i < readCandidates.length; i++) {
+      const el = readCandidates[i];
+      if (!isVisible(el)) continue;
+      // Must have own text content of meaningful length
+      const text = el.textContent.trim();
+      if (text.length < 80) continue;
+      // Skip elements whose children contain most of the text (avoid double-counting)
+      let childTextLen = 0;
+      for (let c = 0; c < el.children.length; c++) {
+        childTextLen += el.children[c].textContent.trim().length;
+      }
+      if (childTextLen > text.length * 0.8) continue;
+
+      const cs3 = window.getComputedStyle(el);
+      const fsPx3 = parseFloat(cs3.fontSize);
+      if (fsPx3 < 12 || fsPx3 > 24) continue;
+
+      const rect3 = el.getBoundingClientRect();
+      if (rect3.width < 100) continue;
+      const padL = parseFloat(cs3.paddingLeft) || 0;
+      const padR = parseFloat(cs3.paddingRight) || 0;
+      const textW = rect3.width - padL - padR;
+      const charW = measureCharWidth(cs3.fontFamily, fsPx3, cs3.fontWeight);
+      if (charW <= 0) continue;
+      const cpl = Math.round(textW / charW);
+      readabilityBlocks.push(cpl);
+    }
+
+    let readability = null;
+    if (readabilityBlocks.length >= 2) {
+      const inRange = readabilityBlocks.filter(c => c >= 45 && c <= 75).length;
+      const tooWide = readabilityBlocks.filter(c => c > 75).length;
+      const tooNarrow = readabilityBlocks.filter(c => c < 45).length;
+      const avgCpl = Math.round(readabilityBlocks.reduce((s, v) => s + v, 0) / readabilityBlocks.length);
+      readability = {
+        blocks: readabilityBlocks.length,
+        comfortable: inRange,
+        comfortablePct: Math.round(inRange / readabilityBlocks.length * 100),
+        tooWide,
+        tooNarrow,
+        avgCharsPerLine: avgCpl,
+      };
+    }
+
     const data = {
       scanned,
       truncatedElements,
+      readability,
       families,
       scale: enrichedScale.map(s => ({
         fontSize: s.fontSize,
@@ -1991,6 +2040,13 @@
           if (c.issue === 'viewport-oversized') lines.push(`  ⚠ ${c.fontSize}px: oversized for viewport (${(c.vwRatio * 100).toFixed(1)}vw > 10vw)`);
           if (c.issue === 'tight-heading-gap') lines.push(`  ⚠ ${c.fontSize}px: tight heading gap (${c.avgGapToNext}px < ${c.threshold}px)`);
         });
+      }
+
+      if (readability) {
+        lines.push('');
+        lines.push(`Line length: ${readability.comfortablePct}% comfortable (${readability.comfortable}/${readability.blocks} blocks in 45–75 chars), avg ${readability.avgCharsPerLine} chars/line`);
+        if (readability.tooWide) lines.push(`  ${readability.tooWide} blocks too wide (>75 chars)`);
+        if (readability.tooNarrow) lines.push(`  ${readability.tooNarrow} blocks too narrow (<45 chars)`);
       }
 
       return { text: lines.join('\n'), data };
