@@ -23,7 +23,7 @@ Pick **5-6 sites** from different categories each run. Aim for diversity — the
 
 Don't repeat the same sites across recent runs. Check `docs/` for prior field test files to avoid overlap.
 
-**Bot protection**: etsy.com, bookshop.org, and medium.com are currently blocked by Cloudflare/captcha challenges in headless browsers. Swap them out rather than burning time on retries.
+**Bot protection**: etsy.com, bookshop.org, medium.com, amazon.com, and reddit.com are currently blocked by bot detection in headless browsers (Cloudflare challenges or skeleton pages with <50 elements). Swap them out rather than burning time on retries.
 
 ## Session Bootstrap
 
