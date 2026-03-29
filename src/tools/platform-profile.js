@@ -206,6 +206,24 @@
       }
     }
 
+    // Z-index stacking complexity
+    const zLayers = new Set();
+    let zMax = 0;
+    for (const el of document.querySelectorAll('*')) {
+      const z = parseInt(getComputedStyle(el).zIndex);
+      if (!isNaN(z) && z !== 0) { zLayers.add(z); if (z > zMax) zMax = z; }
+    }
+    if (zLayers.size > 0) {
+      const sorted = [...zLayers].sort((a, b) => a - b);
+      data.zIndexStats = { layers: zLayers.size, max: zMax, values: sorted };
+      if (zMax > 10000) data.zIndexStats.antiPattern = true;
+      if (wantText) {
+        lines.push('');
+        lines.push('Z-index: ' + zLayers.size + ' layers, max ' + zMax.toLocaleString() + (zMax > 10000 ? ' ⚠ anti-pattern' : ''));
+        lines.push('  values: ' + sorted.join(', '));
+      }
+    }
+
     // Useful meta tags
     const metaTags = ['viewport', 'description', 'theme-color', 'robots', 'og:type', 'og:title'];
     for (const name of metaTags) {
