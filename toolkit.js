@@ -2045,8 +2045,8 @@
       if (readability) {
         lines.push('');
         lines.push(`Line length: ${readability.comfortablePct}% comfortable (${readability.comfortable}/${readability.blocks} blocks in 45–75 chars), avg ${readability.avgCharsPerLine} chars/line`);
-        if (readability.tooWide) lines.push(`  ${readability.tooWide} blocks too wide (>75 chars)`);
-        if (readability.tooNarrow) lines.push(`  ${readability.tooNarrow} blocks too narrow (<45 chars)`);
+        if (readability.tooWide) lines.push(`  ${readability.tooWide} block${readability.tooWide === 1 ? '' : 's'} too wide (>75 chars)`);
+        if (readability.tooNarrow) lines.push(`  ${readability.tooNarrow} block${readability.tooNarrow === 1 ? '' : 's'} too narrow (<45 chars)`);
       }
 
       return { text: lines.join('\n'), data };
