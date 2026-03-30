@@ -2210,7 +2210,12 @@
       // meaningful redistributable space (space-evenly/space-between gaps,
       // or simply unused space in a flex/grid column container).
       // Accumulate from all levels — each ancestor can contribute.
+      // Also track cross-axis headroom separately: when an element is in an
+      // x-axis container with 0 headroom, y-axis ancestors may still provide
+      // room for the element to grow taller (bigger font).
       let outerPx = 0;
+      let crossAxisOuterPx = 0;
+      const crossAxis = axis === 'y' ? 'x' : 'y';
       let ancestor = container.parentElement;
       const maxLevels = 4;
       for (let level = 0; level < maxLevels && ancestor && ancestor !== document.documentElement; level++) {
@@ -2218,11 +2223,12 @@
         const aRect = ancestor.getBoundingClientRect();
         const aAxis = detectAxis(aCs);
 
-        // Only count ancestors that flow in same axis direction
-        if (aAxis === axis || aAxis === 'both') {
-          const aPadStart = px(axis === 'y' ? aCs.paddingTop : aCs.paddingLeft);
-          const aPadEnd = px(axis === 'y' ? aCs.paddingBottom : aCs.paddingRight);
-          const ancestorSize = (axis === 'y' ? aRect.height : aRect.width) - aPadStart - aPadEnd;
+        // Check both same-axis and cross-axis ancestors
+        const measureAxis = (aAxis === axis) ? axis : (aAxis === crossAxis) ? crossAxis : null;
+        if (measureAxis) {
+          const aPadStart = px(measureAxis === 'y' ? aCs.paddingTop : aCs.paddingLeft);
+          const aPadEnd = px(measureAxis === 'y' ? aCs.paddingBottom : aCs.paddingRight);
+          const ancestorSize = (measureAxis === 'y' ? aRect.height : aRect.width) - aPadStart - aPadEnd;
 
           // Sum visible children sizes in this ancestor
           let childrenTotal = 0;
@@ -2233,7 +2239,7 @@
             if (sr.width === 0 && sr.height === 0) continue;
             const sibCs = getComputedStyle(sib);
             if (sibCs.position === 'absolute' || sibCs.position === 'fixed') continue;
-            childrenTotal += axis === 'y' ? sr.height : sr.width;
+            childrenTotal += measureAxis === 'y' ? sr.height : sr.width;
             childrenCount++;
           }
 
@@ -2242,8 +2248,12 @@
 
           // Only count if meaningful (>5px) to avoid noise
           if (redistributable > 5 && childrenCount > 0) {
-            // This branch's share: divided among siblings at this level
-            outerPx += redistributable / childrenCount;
+            const share = redistributable / childrenCount;
+            if (measureAxis === axis) {
+              outerPx += share;
+            } else {
+              crossAxisOuterPx += share;
+            }
           }
         }
         ancestor = ancestor.parentElement;
@@ -2257,6 +2267,7 @@
         outerPx: rd(outerPx),
         totalPx: rd(totalPx),
         perChildPx: childCount > 0 ? rd(totalPx / childCount) : rd(totalPx),
+        crossAxisOuterPx: rd(crossAxisOuterPx),
         containerSize: rd(containerSize),
         textSize: rd(textSize),
         childCount,
@@ -2309,10 +2320,24 @@
       // Calculate max font size from headroom
       // For vertical containers: headroom lets this element grow taller
       // Growth factor: (element_height + share_of_headroom) / element_height
-      const shareOfHeadroom = headroom.perChildPx;
+      //
+      // Cross-axis fallback: when the primary axis has near-zero headroom but
+      // cross-axis ancestors provide space, use that for growth estimation.
+      // Example: a label in an x-axis flex row can grow taller if the parent
+      // column distributes y-axis space via space-evenly.
+      let shareOfHeadroom = headroom.perChildPx;
+      let growthAxis = headroom.axis;
+
+      // If primary axis headroom is near-zero and cross-axis has meaningful space,
+      // use cross-axis headroom with vertical growth logic
+      if (shareOfHeadroom < 5 && headroom.crossAxisOuterPx > 5) {
+        shareOfHeadroom = headroom.crossAxisOuterPx / Math.max(headroom.childCount, 1);
+        growthAxis = headroom.axis === 'y' ? 'x' : 'y';
+      }
+
       let maxSize;
-      if (headroom.axis === 'y') {
-        // Vertical: headroom allows the element to be taller
+      if (growthAxis === 'y') {
+        // Vertical growth: headroom allows the element to be taller
         if (singleLine) {
           // Single line: height ≈ lineHeight, scales linearly with font size
           maxSize = fsPx * ((rect.height + shareOfHeadroom) / Math.max(rect.height, 1));
@@ -2390,20 +2415,25 @@
     const distinctCurrentSizes = [...new Set(elements.map(e => e.current.fontSize))].sort((a, b) => b - a);
 
     // Build a map: currentSize → max allowed suggested size (constrained by hierarchy)
+    // Use the MAX suggested across all elements at each size tier, not just the first.
+    // Different elements at the same size may have very different headroom.
     const sugCap = new Map();
     for (let i = 0; i < distinctCurrentSizes.length; i++) {
       const size = distinctCurrentSizes[i];
-      // Find the raw suggested for this size tier
-      const rep = elements.find(e => e.current.fontSize === size);
-      sugCap.set(size, rep ? rep.suggested : size);
+      const elemsAtSize = elements.filter(e => e.current.fontSize === size);
+      const maxSuggested = elemsAtSize.length > 0
+        ? Math.max(...elemsAtSize.map(e => e.suggested))
+        : size;
+      sugCap.set(size, maxSuggested);
     }
     // Top-down pass: each tier's suggested must be ≤ tier_above.suggested / minRatio
+    // But never cap below the current size (hierarchy should constrain growth, not shrink)
     for (let i = 1; i < distinctCurrentSizes.length; i++) {
       const aboveSize = distinctCurrentSizes[i - 1];
       const thisSize = distinctCurrentSizes[i];
       const aboveSuggested = sugCap.get(aboveSize);
       const thisSuggested = sugCap.get(thisSize);
-      const maxAllowed = Math.floor(aboveSuggested / minRatio);
+      const maxAllowed = Math.max(thisSize, Math.floor(aboveSuggested / minRatio));
       if (thisSuggested > maxAllowed) {
         sugCap.set(thisSize, maxAllowed);
       }
@@ -2415,6 +2445,16 @@
         el.suggested = cap;
         el.delta = el.suggested - el.current.fontSize;
         el.constrainedBy = 'hierarchy';
+      }
+    }
+    // Floor enforcement: hierarchy caps must not push below role floors.
+    // Floors take priority — a below-floor element is always wrong, even if
+    // the hierarchy ratio gets compressed as a result.
+    for (const el of elements) {
+      if (el.suggested < el.floor && el.floor > el.current.fontSize) {
+        el.suggested = el.floor;
+        el.delta = el.suggested - el.current.fontSize;
+        el.constrainedBy = 'floor';
       }
     }
 
@@ -2554,6 +2594,324 @@
         for (const el of group.items) {
           const arrow = el.delta > 0 ? ` → ${el.suggested}px` : '';
           lines.push(`    ${el.selector} ${el.current.fontSize}px${arrow} [${el.role}] "${el.text}"`);
+        }
+      }
+
+      return { text: lines.join('\n'), data };
+    }
+
+    return data;
+  }
+  // === Tool: Alignment Audit — cross-element edge/center alignment checks ===
+  //
+  // Finds groups of elements that should share an alignment axis (same class,
+  // repeated siblings, semantic role) and flags when their edges or centers
+  // drift. Stacking-axis aware: ignores expected spread along the parent's
+  // layout direction (e.g. top/bottom drift in a flex-column).
+  //
+  // Designed for slide decks and fixed-canvas layouts but works on any page.
+
+  function alignmentAudit(opts) {
+    const o = Object.assign({
+      scope: 'body',
+      maxElements: 500,
+      // Tolerance in px — edges within this distance count as aligned
+      tolerance: 2,
+      // Output format: 'json' (default) or 'text'
+      format: 'json',
+    }, opts);
+
+    const root = document.querySelector(o.scope) || document.body;
+    const rd = n => +n.toFixed(1);
+
+    // ---------------------------------------------------------------
+    // Helper: detect parent's stacking axis
+    // ---------------------------------------------------------------
+    function stackingAxis(parent) {
+      if (!parent) return null;
+      const cs = getComputedStyle(parent);
+      const d = cs.display;
+      if (d.includes('flex')) {
+        // flex-wrap means items spread on both axes
+        if (cs.flexWrap && cs.flexWrap !== 'nowrap') return 'xy';
+        const dir = cs.flexDirection;
+        if (dir === 'column' || dir === 'column-reverse') return 'y';
+        return 'x';
+      }
+      if (d.includes('grid')) {
+        const cols = cs.gridTemplateColumns.split(/\s+/).length;
+        const rows = cs.gridTemplateRows.split(/\s+/).length;
+        // Multi-column, multi-row grid: items spread on both axes
+        if (cols > 1 && rows > 1) return 'xy';
+        if (cols > 1) return 'x';
+        return 'y';
+      }
+      // Block flow — stacking is vertical
+      if (d === 'block' || d === 'list-item') return 'y';
+      return null;
+    }
+
+    // Axes that are expected to spread for a given stacking direction
+    const stackingAxes = {
+      x: new Set(['left', 'right', 'centerX']),
+      y: new Set(['top', 'bottom', 'centerY']),
+      xy: new Set(['left', 'right', 'centerX', 'top', 'bottom', 'centerY']),
+    };
+
+    // ---------------------------------------------------------------
+    // Helper: build a unique, readable label for an element
+    // ---------------------------------------------------------------
+    function elLabel(el) {
+      const tag = el.tagName.toLowerCase();
+      const cls = el.className && typeof el.className === 'string'
+        ? el.className.trim().split(/\s+/).slice(0, 2).join('.')
+        : '';
+      let label = cls ? tag + '.' + cls : tag;
+      // Add disambiguating text snippet
+      const text = el.textContent.trim();
+      if (text.length > 0 && text.length < 60) {
+        label += ' "' + (text.length > 30 ? text.slice(0, 27) + '...' : text) + '"';
+      }
+      return label;
+    }
+
+    // ---------------------------------------------------------------
+    // 1. Collect visible elements with bounding rects
+    // ---------------------------------------------------------------
+    const allEls = root.querySelectorAll('*');
+    const measured = [];
+    for (let i = 0; i < allEls.length && measured.length < o.maxElements; i++) {
+      const el = allEls[i];
+      if (!isVisible(el)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) continue;
+
+      const classes = el.className && typeof el.className === 'string'
+        ? el.className.trim().split(/\s+/).sort().join(' ')
+        : '';
+
+      measured.push({
+        el,
+        tag: el.tagName.toLowerCase(),
+        classes,
+        label: elLabel(el),
+        left: rd(rect.left),
+        right: rd(rect.right),
+        top: rd(rect.top),
+        bottom: rd(rect.bottom),
+        centerX: rd(rect.left + rect.width / 2),
+        centerY: rd(rect.top + rect.height / 2),
+        width: rd(rect.width),
+        height: rd(rect.height),
+      });
+    }
+
+    // ---------------------------------------------------------------
+    // 2. Build alignment groups
+    // ---------------------------------------------------------------
+    // Sibling groups: same parent + same first class
+    // Cross-parent groups: same first class, multiple parents
+
+    const siblingGroups = new Map();  // key: parentElement DOM node + class
+    const classGroups = new Map();
+    let parentId = 0;
+    const parentIds = new WeakMap();  // DOM node → unique id
+
+    for (const m of measured) {
+      if (!m.classes) continue;
+      const firstClass = m.classes.split(' ')[0];
+      if (!firstClass) continue;
+
+      // Skip broad container elements
+      if (m.el.children.length > 3 && m.el.textContent.trim().length > 200) continue;
+
+      const parent = m.el.parentElement;
+      if (parent) {
+        // Use actual DOM identity, not path string, to avoid false siblings
+        if (!parentIds.has(parent)) parentIds.set(parent, parentId++);
+        const sibKey = parentIds.get(parent) + '|.' + firstClass;
+        if (!siblingGroups.has(sibKey)) {
+          siblingGroups.set(sibKey, { members: [], parent, label: elPath(parent, 3) + '|.' + firstClass });
+        }
+        siblingGroups.get(sibKey).members.push(m);
+      }
+
+      if (!classGroups.has(firstClass)) classGroups.set(firstClass, []);
+      classGroups.get(firstClass).push(m);
+    }
+
+    // ---------------------------------------------------------------
+    // 3. Analyze alignment — stacking-axis aware
+    // ---------------------------------------------------------------
+    const tol = o.tolerance;
+
+    function analyzeGroup(members, groupLabel, parentEl) {
+      if (members.length < 2) return null;
+
+      // Determine which axes to skip (expected spread along stacking direction)
+      const skip = new Set();
+      if (parentEl) {
+        const axis = stackingAxis(parentEl);
+        if (axis && stackingAxes[axis]) {
+          for (const a of stackingAxes[axis]) skip.add(a);
+        }
+      }
+      // For cross-parent groups, walk up the tree to find the nearest
+      // common ancestor whose children (or descendants) contain all members.
+      // Skip that ancestor's stacking axis since vertical/horizontal spread
+      // is expected when elements live inside stacked containers.
+      if (!parentEl) {
+        const els = members.map(m => m.el);
+        // Walk up to 5 levels from each element, collecting ancestor chains
+        const maxWalk = 5;
+        for (let level = 1; level <= maxWalk; level++) {
+          const ancestors = els.map(el => {
+            let node = el;
+            for (let i = 0; i < level; i++) {
+              if (node.parentElement) node = node.parentElement;
+            }
+            return node;
+          });
+          // Check if all ancestors at this level share the same parent
+          const ancestorParents = [...new Set(ancestors.map(a => a.parentElement).filter(Boolean))];
+          if (ancestorParents.length === 1) {
+            const axis = stackingAxis(ancestorParents[0]);
+            if (axis && stackingAxes[axis]) {
+              for (const a of stackingAxes[axis]) skip.add(a);
+            }
+            break;
+          }
+        }
+      }
+
+      const allAxes = ['left', 'right', 'top', 'bottom', 'centerX', 'centerY'];
+      const issues = [];
+
+      for (const axis of allAxes) {
+        if (skip.has(axis)) continue;
+
+        const values = members.map(m => m[axis]);
+        const min = Math.min(...values);
+        const max = Math.max(...values);
+        const spread = rd(max - min);
+
+        if (spread > tol) {
+          const sorted = values.slice().sort((a, b) => a - b);
+          const median = sorted[Math.floor(sorted.length / 2)];
+          const outliers = members
+            .filter(m => Math.abs(m[axis] - median) > tol)
+            .map(m => ({
+              label: m.label,
+              value: m[axis],
+              drift: rd(m[axis] - median),
+            }));
+
+          if (outliers.length > 0) {
+            issues.push({ axis, spread, median, min, max, outliers });
+          }
+        }
+      }
+
+      if (issues.length === 0) return null;
+
+      return {
+        group: groupLabel,
+        count: members.length,
+        members: members.map(m => ({
+          label: m.label,
+          left: m.left, right: m.right, top: m.top, bottom: m.bottom,
+          centerX: m.centerX, centerY: m.centerY,
+        })),
+        issues,
+      };
+    }
+
+    // ---------------------------------------------------------------
+    // 4. Run analysis, collect findings
+    // ---------------------------------------------------------------
+    const findings = [];
+
+    for (const [, { members, parent, label: groupLabel }] of siblingGroups) {
+      if (members.length < 2) continue;
+      const result = analyzeGroup(members, groupLabel, parent);
+      if (result) {
+        result.type = 'sibling';
+        findings.push(result);
+      }
+    }
+
+    for (const [cls, members] of classGroups) {
+      if (members.length < 2) continue;
+      const parents = [...new Set(members.map(m => m.el.parentElement).filter(Boolean))];
+      if (parents.length < 2) continue;
+
+      // Skip cross-parent groups where every member lives inside an
+      // independent multi-column GRID (not flex). Grid cells in different
+      // columns are expected to have x-spread. Flex-rows (marker + body)
+      // should have consistent alignment across cards.
+      const allInGrid = parents.every(p => {
+        for (let node = p, depth = 0; node && depth < 2; node = node.parentElement, depth++) {
+          if (!node) break;
+          const cs = getComputedStyle(node);
+          if (cs.display.includes('grid')) {
+            const cols = cs.gridTemplateColumns.split(/\s+/).length;
+            if (cols > 1) return true;
+          }
+        }
+        return false;
+      });
+      if (allInGrid) continue;
+
+      const result = analyzeGroup(members, '.' + cls, null);
+      if (result) {
+        result.type = 'cross-parent';
+        findings.push(result);
+      }
+    }
+
+    // Sort by worst spread
+    findings.sort((a, b) => {
+      const aMax = Math.max(...a.issues.map(i => i.spread));
+      const bMax = Math.max(...b.issues.map(i => i.spread));
+      return bMax - aMax;
+    });
+
+    // ---------------------------------------------------------------
+    // 5. Summary
+    // ---------------------------------------------------------------
+    const summary = {
+      elementsScanned: measured.length,
+      siblingGroupsChecked: [...siblingGroups.values()].filter(g => g.members.length >= 2).length,
+      classGroupsChecked: [...classGroups.values()].filter(g => g.length >= 2).length,
+      issuesFound: findings.length,
+      worstSpread: findings.length > 0 ? Math.max(...findings.flatMap(f => f.issues.map(i => i.spread))) : 0,
+    };
+
+    const data = { summary, findings };
+
+    // ---------------------------------------------------------------
+    // 6. Text output
+    // ---------------------------------------------------------------
+    if (o.format === 'text') {
+      const lines = [];
+      lines.push(`Alignment Audit — ${summary.elementsScanned} elements, ${summary.issuesFound} issues`);
+      lines.push('');
+
+      if (findings.length === 0) {
+        lines.push('No alignment issues found (within ' + tol + 'px tolerance).');
+      } else {
+        for (const f of findings) {
+          const worstIssue = f.issues.reduce((a, b) => a.spread > b.spread ? a : b);
+          lines.push(`[${f.type}] ${f.group} (${f.count} elements)`);
+
+          for (const issue of f.issues) {
+            lines.push(`  ${issue.axis}: ${issue.spread}px spread (${issue.min} → ${issue.max})`);
+            for (const out of issue.outliers) {
+              const sign = out.drift > 0 ? '+' : '';
+              lines.push(`    ${out.label}: ${out.value}px (${sign}${out.drift})`);
+            }
+          }
+          lines.push('');
         }
       }
 
@@ -4870,6 +5228,7 @@
     layoutTree,
     layoutDensity,
     fontTuning,
+    alignmentAudit,
     // Platform & composite tools
     platformProfile,
     siteProfile,

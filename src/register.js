@@ -25,6 +25,7 @@
     layoutTree,
     layoutDensity,
     fontTuning,
+    alignmentAudit,
     // Platform & composite tools
     platformProfile,
     siteProfile,

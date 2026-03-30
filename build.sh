@@ -24,6 +24,7 @@ cat \
   src/tools/palette-profile.js \
   src/tools/typography-profile.js \
   src/tools/font-tuning.js \
+  src/tools/alignment-audit.js \
   src/tools/gradient-profile.js \
   src/tools/spacing-profile.js \
   src/tools/responsive-profile.js \
