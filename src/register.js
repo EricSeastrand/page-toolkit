@@ -24,6 +24,7 @@
     layoutGap,
     layoutTree,
     layoutDensity,
+    fontTuning,
     // Platform & composite tools
     platformProfile,
     siteProfile,
