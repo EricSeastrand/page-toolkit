@@ -1,10 +1,5 @@
 const { test: base, chromium } = require('@playwright/test');
-const path = require('path');
-const fs = require('fs');
-
-const CDP_ENDPOINT = process.env.CDP_ENDPOINT || 'ws://10.23.20.10:3000?token=headless-browser-token';
-const TOOLKIT_PATH = path.join(__dirname, '..', 'toolkit.js');
-const TOOLKIT_SCRIPT = fs.readFileSync(TOOLKIT_PATH, 'utf8');
+const { CDP_ENDPOINT, createStealthContext } = require('./stealth-config');
 
 // Extend Playwright's test to connect via CDP and auto-inject the toolkit
 const test = base.extend({
@@ -15,10 +10,9 @@ const test = base.extend({
     await browser.close();
   },
 
-  // Fresh context per test with the toolkit init script
+  // Fresh context per test with stealth + toolkit init scripts
   context: async ({ browser }, use) => {
-    const context = await browser.newContext();
-    await context.addInitScript(TOOLKIT_SCRIPT);
+    const context = await createStealthContext(browser);
     await use(context);
     await context.close();
   },

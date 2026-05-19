@@ -8,9 +8,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 
-const CDP_ENDPOINT = process.env.CDP_ENDPOINT || 'ws://10.23.20.10:3000?token=headless-browser-token';
-const TOOLKIT_PATH = path.join(__dirname, '..', 'toolkit.js');
-const TOOLKIT_SCRIPT = fs.readFileSync(TOOLKIT_PATH, 'utf8');
+const { CDP_ENDPOINT, createStealthContext } = require('./stealth-config');
 
 const SITES = [
   { name: 'stripe', url: 'https://stripe.com' },
@@ -52,11 +50,7 @@ const TOOLS = [
 
 async function exploreSite(browser, site) {
   const results = { site: site.name, url: site.url, tools: {}, errors: [], pageErrors: [] };
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 800 },
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  });
-  await context.addInitScript(TOOLKIT_SCRIPT);
+  const context = await createStealthContext(browser);
   const page = await context.newPage();
 
   // Capture page errors
