@@ -153,7 +153,12 @@
       // meaningful redistributable space (space-evenly/space-between gaps,
       // or simply unused space in a flex/grid column container).
       // Accumulate from all levels — each ancestor can contribute.
+      // Also track cross-axis headroom separately: when an element is in an
+      // x-axis container with 0 headroom, y-axis ancestors may still provide
+      // room for the element to grow taller (bigger font).
       let outerPx = 0;
+      let crossAxisOuterPx = 0;
+      const crossAxis = axis === 'y' ? 'x' : 'y';
       let ancestor = container.parentElement;
       const maxLevels = 4;
       for (let level = 0; level < maxLevels && ancestor && ancestor !== document.documentElement; level++) {
@@ -161,11 +166,12 @@
         const aRect = ancestor.getBoundingClientRect();
         const aAxis = detectAxis(aCs);
 
-        // Only count ancestors that flow in same axis direction
-        if (aAxis === axis || aAxis === 'both') {
-          const aPadStart = px(axis === 'y' ? aCs.paddingTop : aCs.paddingLeft);
-          const aPadEnd = px(axis === 'y' ? aCs.paddingBottom : aCs.paddingRight);
-          const ancestorSize = (axis === 'y' ? aRect.height : aRect.width) - aPadStart - aPadEnd;
+        // Check both same-axis and cross-axis ancestors
+        const measureAxis = (aAxis === axis) ? axis : (aAxis === crossAxis) ? crossAxis : null;
+        if (measureAxis) {
+          const aPadStart = px(measureAxis === 'y' ? aCs.paddingTop : aCs.paddingLeft);
+          const aPadEnd = px(measureAxis === 'y' ? aCs.paddingBottom : aCs.paddingRight);
+          const ancestorSize = (measureAxis === 'y' ? aRect.height : aRect.width) - aPadStart - aPadEnd;
 
           // Sum visible children sizes in this ancestor
           let childrenTotal = 0;
@@ -176,7 +182,7 @@
             if (sr.width === 0 && sr.height === 0) continue;
             const sibCs = getComputedStyle(sib);
             if (sibCs.position === 'absolute' || sibCs.position === 'fixed') continue;
-            childrenTotal += axis === 'y' ? sr.height : sr.width;
+            childrenTotal += measureAxis === 'y' ? sr.height : sr.width;
             childrenCount++;
           }
 
@@ -185,8 +191,12 @@
 
           // Only count if meaningful (>5px) to avoid noise
           if (redistributable > 5 && childrenCount > 0) {
-            // This branch's share: divided among siblings at this level
-            outerPx += redistributable / childrenCount;
+            const share = redistributable / childrenCount;
+            if (measureAxis === axis) {
+              outerPx += share;
+            } else {
+              crossAxisOuterPx += share;
+            }
           }
         }
         ancestor = ancestor.parentElement;
@@ -200,6 +210,7 @@
         outerPx: rd(outerPx),
         totalPx: rd(totalPx),
         perChildPx: childCount > 0 ? rd(totalPx / childCount) : rd(totalPx),
+        crossAxisOuterPx: rd(crossAxisOuterPx),
         containerSize: rd(containerSize),
         textSize: rd(textSize),
         childCount,
@@ -252,10 +263,24 @@
       // Calculate max font size from headroom
       // For vertical containers: headroom lets this element grow taller
       // Growth factor: (element_height + share_of_headroom) / element_height
-      const shareOfHeadroom = headroom.perChildPx;
+      //
+      // Cross-axis fallback: when the primary axis has near-zero headroom but
+      // cross-axis ancestors provide space, use that for growth estimation.
+      // Example: a label in an x-axis flex row can grow taller if the parent
+      // column distributes y-axis space via space-evenly.
+      let shareOfHeadroom = headroom.perChildPx;
+      let growthAxis = headroom.axis;
+
+      // If primary axis headroom is near-zero and cross-axis has meaningful space,
+      // use cross-axis headroom with vertical growth logic
+      if (shareOfHeadroom < 5 && headroom.crossAxisOuterPx > 5) {
+        shareOfHeadroom = headroom.crossAxisOuterPx / Math.max(headroom.childCount, 1);
+        growthAxis = headroom.axis === 'y' ? 'x' : 'y';
+      }
+
       let maxSize;
-      if (headroom.axis === 'y') {
-        // Vertical: headroom allows the element to be taller
+      if (growthAxis === 'y') {
+        // Vertical growth: headroom allows the element to be taller
         if (singleLine) {
           // Single line: height ≈ lineHeight, scales linearly with font size
           maxSize = fsPx * ((rect.height + shareOfHeadroom) / Math.max(rect.height, 1));
@@ -333,20 +358,25 @@
     const distinctCurrentSizes = [...new Set(elements.map(e => e.current.fontSize))].sort((a, b) => b - a);
 
     // Build a map: currentSize → max allowed suggested size (constrained by hierarchy)
+    // Use the MAX suggested across all elements at each size tier, not just the first.
+    // Different elements at the same size may have very different headroom.
     const sugCap = new Map();
     for (let i = 0; i < distinctCurrentSizes.length; i++) {
       const size = distinctCurrentSizes[i];
-      // Find the raw suggested for this size tier
-      const rep = elements.find(e => e.current.fontSize === size);
-      sugCap.set(size, rep ? rep.suggested : size);
+      const elemsAtSize = elements.filter(e => e.current.fontSize === size);
+      const maxSuggested = elemsAtSize.length > 0
+        ? Math.max(...elemsAtSize.map(e => e.suggested))
+        : size;
+      sugCap.set(size, maxSuggested);
     }
     // Top-down pass: each tier's suggested must be ≤ tier_above.suggested / minRatio
+    // But never cap below the current size (hierarchy should constrain growth, not shrink)
     for (let i = 1; i < distinctCurrentSizes.length; i++) {
       const aboveSize = distinctCurrentSizes[i - 1];
       const thisSize = distinctCurrentSizes[i];
       const aboveSuggested = sugCap.get(aboveSize);
       const thisSuggested = sugCap.get(thisSize);
-      const maxAllowed = Math.floor(aboveSuggested / minRatio);
+      const maxAllowed = Math.max(thisSize, Math.floor(aboveSuggested / minRatio));
       if (thisSuggested > maxAllowed) {
         sugCap.set(thisSize, maxAllowed);
       }
@@ -358,6 +388,16 @@
         el.suggested = cap;
         el.delta = el.suggested - el.current.fontSize;
         el.constrainedBy = 'hierarchy';
+      }
+    }
+    // Floor enforcement: hierarchy caps must not push below role floors.
+    // Floors take priority — a below-floor element is always wrong, even if
+    // the hierarchy ratio gets compressed as a result.
+    for (const el of elements) {
+      if (el.suggested < el.floor && el.floor > el.current.fontSize) {
+        el.suggested = el.floor;
+        el.delta = el.suggested - el.current.fontSize;
+        el.constrainedBy = 'floor';
       }
     }
 
