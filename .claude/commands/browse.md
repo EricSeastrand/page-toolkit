@@ -12,6 +12,8 @@ $ARGUMENTS — URL to analyze, or a description of what to investigate
 
 ```js
 async (page) => {
+  // Stealth patches — inject BEFORE toolkit and navigation
+  await page.context().addInitScript({ path: '/home/eric/page-toolkit/src/stealth.js' });
   await page.context().addInitScript({ path: '/home/eric/page-toolkit/toolkit.js' });
   await page.goto('https://example.com', { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3000);
