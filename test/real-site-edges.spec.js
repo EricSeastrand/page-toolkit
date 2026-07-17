@@ -346,6 +346,42 @@ test.describe('platformProfile on simple page', () => {
   });
 });
 
+// ── Shopify Web Pixels (sandboxed Customer Events) detection ─────────────────
+// Regression guard for the juicerunners.com false-negative: platformProfile used
+// to report analytics:[] on Shopify stores because pixels run in a sandboxed
+// worker (no gtag/fbq globals) behind a first-party CDN path.
+
+test.describe('platformProfile detects Shopify web pixels', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/shopify-pixels.html');
+  });
+
+  test('identifies the store as Shopify', async ({ page }) => {
+    const result = await page.evaluate(() => __ps.platformProfile());
+    expect(result.cms).toBe('Shopify');
+  });
+
+  test('does NOT report empty analytics on a Shopify store', async ({ page }) => {
+    const result = await page.evaluate(() => __ps.platformProfile());
+    expect(result.analytics.length).toBeGreaterThan(0);
+  });
+
+  test('detects the sandboxed Customer Events web pixel', async ({ page }) => {
+    const result = await page.evaluate(() => __ps.platformProfile());
+    expect(result.analytics).toContain('Shopify Web Pixels (Customer Events)');
+  });
+
+  test('always reports Shopify-native analytics', async ({ page }) => {
+    const result = await page.evaluate(() => __ps.platformProfile());
+    expect(result.analytics).toContain('Shopify Analytics (native)');
+  });
+
+  test('captures the app-pixel registration id', async ({ page }) => {
+    const result = await page.evaluate(() => __ps.platformProfile());
+    expect(result.shopifyPixels).toContain('545161372');
+  });
+});
+
 // ── Gesture tools ───────────────────────────────────────────────────────────
 
 test.describe('gesture tools on real-world page', () => {

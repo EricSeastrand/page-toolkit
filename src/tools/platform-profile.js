@@ -116,11 +116,42 @@
     if (window.klaviyo || window._klOnsite) analyticsMap.set('Klaviyo', true);
     if (window.hj) analyticsMap.set('Hotjar', true);
 
+    // Shopify Web Pixels (Customer Events). Since ~2023 Shopify runs GA4 / Meta /
+    // TikTok / app pixels inside a sandboxed web worker via web-pixels-manager, so
+    // the classic gtag/fbq globals never appear on the top window and the vendor is
+    // hidden behind Shopify's first-party CDN path (/web-pixels@HASH/app/
+    // web-pixel-<id>@HASH/pixel.modern.js). The generic patterns above can't see any
+    // of that — detect the loader + individual app pixels by their script src.
+    const shopifyPixelIds = [];
+    for (const src of scriptSrcs) {
+      const m = src.match(/\/web-pixel-(\d+)[@/]/);
+      if (m) shopifyPixelIds.push(m[1]);
+      if (/\/web-pixels[@/]|\/wpm[@/]|web-pixels-manager|shop_events_listener/.test(src)) {
+        analyticsMap.set('Shopify Web Pixels (Customer Events)', true);
+      }
+      if (/monorail-edge\.shopifysvc\.com/.test(src)) {
+        analyticsMap.set('Shopify Analytics (native)', true);
+      }
+    }
+    if (shopifyPixelIds.length) {
+      data.shopifyPixels = [...new Set(shopifyPixelIds)];
+      analyticsMap.set('Shopify Web Pixels (Customer Events)', true);
+    }
+    // Shopify-native analytics (trekkie -> monorail) ships on 100% of storefronts and
+    // feeds Admin > Analytics regardless of any third-party pixel. If this IS a Shopify
+    // store, first-party measurement is ALWAYS present — never report "no analytics".
+    if (data.cms === 'Shopify' || window.Shopify) {
+      analyticsMap.set('Shopify Analytics (native)', true);
+    }
+
     data.analytics = [...analyticsMap.keys()];
     if (data.analytics.length && wantText) {
       lines.push('');
       lines.push('Integrations (' + data.analytics.length + '):');
       for (const a of data.analytics) lines.push('  ' + a);
+      if (data.shopifyPixels) {
+        lines.push('  (Shopify web-pixel app IDs: ' + data.shopifyPixels.join(', ') + ' — vendor hidden by sandbox)');
+      }
     }
 
     // Modern CSS features census

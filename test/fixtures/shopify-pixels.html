@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shopify Web Pixels fixture</title>
+  <!-- Mimic a real Shopify storefront: window.Shopify is set on the TOP window
+       (not sandboxed), but the pixels themselves load via web-pixels-manager into
+       a sandboxed worker. Classic gtag/fbq globals are therefore absent. The only
+       top-document trace is the app-pixel script src on Shopify's first-party CDN. -->
+  <script>
+    window.Shopify = { theme: { name: 'Test Theme', id: 123456789, role: 'main' } };
+  </script>
+  <!-- web-pixels-manager loader -->
+  <script src="/web-pixels-manager@0.0.312/sandbox/worker.js"></script>
+  <!-- a merchant-installed Customer Events app pixel (id 545161372), exactly the
+       shape captured on juicerunners.com -->
+  <script src="/web-pixels@38536c96/app/web-pixel-545161372@20a1a395/pixel.modern.js"></script>
+</head>
+<body>
+  <h1>Shopify store</h1>
+  <p>Fixture for platformProfile Shopify web-pixel detection.</p>
+</body>
+</html>
